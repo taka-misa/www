@@ -1,1 +1,1050 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>作業時間表・請求書ジェネレーター</title>
+<style>
+  :root {
+    --border: #d8dce1;
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --accent: #2f5fa8;
+    --accent-dark: #234880;
+    --text: #22262b;
+    --muted: #6b7280;
+    --danger: #c0392b;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", Meiryo, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  header.app-header {
+    background: var(--accent-dark);
+    color: #fff;
+    padding: 20px 24px;
+  }
+  header.app-header h1 { margin: 0 0 4px; font-size: 1.4rem; }
+  header.app-header p { margin: 0; font-size: 0.85rem; color: #dbe4f3; }
+  main { max-width: 1080px; margin: 0 auto; padding: 20px 16px 80px; }
+  section.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  section.panel h2 {
+    margin: 0 0 4px;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  section.panel h2 .step-no {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.8rem;
+  }
+  .desc { color: var(--muted); font-size: 0.85rem; margin: 0 0 16px; }
+  .field-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin-bottom: 12px; }
+  .field { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; }
+  .field label { color: var(--muted); }
+  .field input, .field select, .field textarea {
+    font: inherit;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--text);
+  }
+  .field.grow { flex: 1; min-width: 200px; }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 6px;
+  }
+  button:hover { background: var(--accent-dark); }
+  button.secondary { background: #fff; color: var(--accent); }
+  button.secondary:hover { background: #eef3fb; }
+  button.small { padding: 4px 10px; font-size: 0.8rem; }
+  button.link-btn { background: none; border: none; color: var(--accent); padding: 2px 4px; text-decoration: underline; }
+  button.link-btn:hover { background: none; color: var(--accent-dark); }
+  #importStatus { font-size: 0.85rem; margin-top: 8px; }
+  #importStatus.error { color: var(--danger); }
+  #importStatus.ok { color: #1e7e34; }
+  table.editable { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  table.editable th, table.editable td { border: 1px solid var(--border); padding: 4px 6px; text-align: left; }
+  table.editable th { background: #eef1f5; white-space: nowrap; }
+  table.editable input[type="text"], table.editable input[type="date"], table.editable input[type="time"], table.editable input[type="number"] {
+    width: 100%; border: 1px solid transparent; padding: 3px 4px; background: transparent; font: inherit;
+  }
+  table.editable input:focus { border-color: var(--accent); background: #fff; outline: none; }
+  table.editable input.num { text-align: right; }
+  table.editable tbody tr:hover { background: #fafbfd; }
+  .col-chk { width: 30px; text-align: center; }
+  .col-del { width: 30px; text-align: center; }
+  .del-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.9rem; padding: 0; }
+  .table-wrap { overflow-x: auto; }
+  .total-line { margin-top: 12px; font-size: 0.95rem; display: flex; gap: 24px; align-items: center; }
+  .total-line strong { font-size: 1.1rem; }
+  .btn-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .two-col h3 { font-size: 0.9rem; margin: 0 0 8px; color: var(--muted); border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  .hint-box { background: #eef3fb; border: 1px solid #c9dbf2; border-radius: 6px; padding: 8px 12px; font-size: 0.82rem; color: #234880; margin-top: 8px; }
+  .help-note { font-size: 0.78rem; color: var(--muted); margin-top: 6px; }
+  #invoicePreview {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    margin-top: 20px;
+    max-width: 780px;
+  }
+  #invoicePreview h2.doc-title { text-align: center; font-size: 1.6rem; letter-spacing: 0.3em; margin: 0 0 24px; }
+  .preview-top { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
+  .preview-client { font-size: 1.05rem; }
+  .preview-client .name { font-size: 1.2rem; border-bottom: 2px solid var(--text); display: inline-block; padding-bottom: 2px; }
+  .preview-meta { font-size: 0.85rem; text-align: right; }
+  .preview-meta div { margin-bottom: 2px; }
+  .preview-issuer { margin-top: 24px; font-size: 0.85rem; text-align: right; white-space: pre-line; }
+  .preview-total-box { border: 2px solid var(--text); display: inline-block; padding: 8px 20px; font-size: 1.15rem; margin: 12px 0 24px; }
+  table.invoice-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 8px; }
+  table.invoice-table th, table.invoice-table td { border: 1px solid var(--text); padding: 6px 8px; }
+  table.invoice-table th { background: #f0f0f0; }
+  table.invoice-table td.num { text-align: right; }
+  .summary-table { margin-left: auto; width: 260px; border-collapse: collapse; font-size: 0.9rem; margin-top: 8px; }
+  .summary-table td { padding: 4px 8px; border: 1px solid var(--border); }
+  .summary-table td.num { text-align: right; }
+  .summary-table tr.grand td { font-weight: bold; font-size: 1.05rem; }
+  .preview-footer { display: flex; justify-content: space-between; margin-top: 24px; font-size: 0.82rem; }
+  .preview-footer .remarks { max-width: 55%; white-space: pre-line; }
+  footer.app-footer { text-align: center; color: var(--muted); font-size: 0.78rem; padding: 24px 16px; }
 
+  @media print {
+    body { background: #fff; }
+    header.app-header, footer.app-footer, .no-print { display: none !important; }
+    main { max-width: none; padding: 0; }
+    section.panel { display: none !important; }
+    #invoicePreviewSection { display: block !important; border: none; }
+    #invoicePreview { box-shadow: none; border: none; margin: 0 auto; max-width: 100%; padding: 0; }
+    @page { size: A4; margin: 18mm; }
+  }
+</style>
+</head>
+<body>
+<header class="app-header">
+  <h1>作業時間表・請求書ジェネレーター</h1>
+  <p>Googleカレンダーのエクスポート(ICS)を取り込み、作業時間表と請求書を作成します。すべての処理はブラウザ内で完結し、データはどこにも送信されません(入力内容はこの端末のブラウザにのみ保存されます)。</p>
+</header>
+
+<main>
+  <!-- STEP 1: import -->
+  <section class="panel" id="step1">
+    <h2><span class="step-no">1</span>Googleカレンダーの予定を取り込む</h2>
+    <p class="desc">
+      Googleカレンダーの「設定」→「インポート/エクスポート」からエクスポートした .ics ファイルを選択してください。
+      会社アカウントのカレンダーでも、そのアカウントでカレンダー設定にアクセスできればエクスポート可能です
+      (組織の管理者がエクスポート機能を制限している場合を除きます)。
+    </p>
+    <div class="field-row">
+      <div class="field grow">
+        <label for="icsFiles">ICSファイル(複数選択可)</label>
+        <input type="file" id="icsFiles" accept=".ics,text/calendar" multiple>
+      </div>
+      <div class="field">
+        <label for="rangeFrom">対象期間(開始)</label>
+        <input type="date" id="rangeFrom">
+      </div>
+      <div class="field">
+        <label for="rangeTo">対象期間(終了)</label>
+        <input type="date" id="rangeTo">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field grow">
+        <label for="excludeKeywords">件名にこのキーワードを含む予定は自動で除外(カンマ区切り、任意)</label>
+        <input type="text" id="excludeKeywords" placeholder="例: 祝日, 休暇, ランチ">
+      </div>
+      <div>
+        <button type="button" id="importBtn">取り込む</button>
+      </div>
+    </div>
+    <div id="importStatus"></div>
+    <p class="help-note">
+      終日の予定(祝日など)は初期状態で「含める」チェックが外れます。繰り返し予定は毎日・毎週(曜日指定含む)・毎月・毎年の基本パターンに対応しています。
+      取り込み後は下の作業時間表で自由に編集・追加・削除できます。
+    </p>
+  </section>
+
+  <!-- STEP 2: timesheet -->
+  <section class="panel" id="step2">
+    <h2><span class="step-no">2</span>作業時間表を確認・編集する</h2>
+    <p class="desc">「含める」にチェックした行が作業時間の合計と請求書の作業時間に反映されます。開始・終了時刻を変更すると作業時間が自動再計算されます。</p>
+    <div class="table-wrap">
+      <table class="editable">
+        <thead>
+          <tr>
+            <th class="col-chk">含める</th>
+            <th>日付</th>
+            <th>開始</th>
+            <th>終了</th>
+            <th>作業時間(h)</th>
+            <th>件名</th>
+            <th>備考</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="tsBody"></tbody>
+      </table>
+    </div>
+    <div class="total-line">
+      <span>件数: <span id="tsCount">0</span></span>
+      <span>合計作業時間: <strong id="tsTotal">0.00</strong> 時間</span>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="secondary" id="addRowBtn">＋ 行を追加</button>
+      <button type="button" class="secondary" id="checkAllBtn">全て含める</button>
+      <button type="button" class="secondary" id="uncheckAllBtn">全て除外</button>
+      <button type="button" id="exportCsvBtn">作業時間表をCSVで書き出す(Excel/スプレッドシートで開けます)</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: invoice -->
+  <section class="panel" id="step3">
+    <h2><span class="step-no">3</span>請求書を作成する</h2>
+    <p class="desc">時給制(作業時間 × 単価)で金額を計算します。入力内容はこの端末のブラウザに自動保存されます。</p>
+
+    <div class="two-col">
+      <div>
+        <h3>発行者情報(あなた)</h3>
+        <div class="field"><label for="issuerName">氏名 / 会社名</label><input type="text" id="issuerName"></div>
+        <div class="field"><label for="issuerZip">郵便番号</label><input type="text" id="issuerZip" placeholder="000-0000"></div>
+        <div class="field"><label for="issuerAddress">住所</label><input type="text" id="issuerAddress"></div>
+        <div class="field"><label for="issuerTel">電話番号</label><input type="text" id="issuerTel"></div>
+        <div class="field"><label for="issuerEmail">メールアドレス</label><input type="text" id="issuerEmail"></div>
+        <div class="field"><label for="issuerRegNo">適格請求書発行事業者登録番号(任意)</label><input type="text" id="issuerRegNo" placeholder="T0000000000000"></div>
+      </div>
+      <div>
+        <h3>請求先</h3>
+        <div class="field"><label for="clientName">宛先名</label><input type="text" id="clientName" placeholder="株式会社◯◯"></div>
+        <div class="field"><label for="clientHonorific">敬称</label>
+          <select id="clientHonorific">
+            <option value="御中">御中</option>
+            <option value="様">様</option>
+          </select>
+        </div>
+        <div class="field"><label for="invoiceNo">請求書番号</label><input type="text" id="invoiceNo"></div>
+        <div class="field"><label for="issueDate">発行日</label><input type="date" id="issueDate"></div>
+        <div class="field"><label for="dueDate">支払期限</label><input type="date" id="dueDate"></div>
+        <div class="field"><label for="invoiceTitle">件名</label><input type="text" id="invoiceTitle" placeholder="例: 2026年9月分 作業料"></div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:20px;">明細</h3>
+    <div class="hint-box">
+      作業時間表の現在の合計: <strong id="hoursHint">0.00</strong> 時間
+      <button type="button" class="link-btn" id="applyHoursBtn">→ 1行目の数量にこの時間数を反映</button>
+    </div>
+    <div class="table-wrap" style="margin-top:8px;">
+      <table class="editable" id="lineItemsTable">
+        <thead>
+          <tr>
+            <th>品目</th>
+            <th style="width:90px;">数量</th>
+            <th style="width:70px;">単位</th>
+            <th style="width:110px;">単価(円)</th>
+            <th style="width:120px;">金額(円)</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="lineItemsBody"></tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="secondary small" id="addLineBtn">＋ 明細行を追加</button>
+    </div>
+
+    <div class="field-row" style="margin-top:16px;">
+      <div class="field"><label for="taxRate">消費税率(%)</label><input type="number" id="taxRate" step="1" min="0" style="width:80px;"></div>
+    </div>
+
+    <div class="two-col" style="margin-top:16px;">
+      <div>
+        <h3>振込先</h3>
+        <div class="field"><label for="bankName">金融機関名</label><input type="text" id="bankName"></div>
+        <div class="field"><label for="bankBranch">支店名</label><input type="text" id="bankBranch"></div>
+        <div class="field"><label for="bankAccountType">口座種別</label>
+          <select id="bankAccountType">
+            <option value="普通">普通</option>
+            <option value="当座">当座</option>
+          </select>
+        </div>
+        <div class="field"><label for="bankAccountNo">口座番号</label><input type="text" id="bankAccountNo"></div>
+        <div class="field"><label for="bankAccountHolder">口座名義</label><input type="text" id="bankAccountHolder"></div>
+      </div>
+      <div>
+        <h3>備考</h3>
+        <div class="field"><textarea id="remarks" rows="6" placeholder="振込手数料は貴社にてご負担いただけますと幸いです。"></textarea></div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button type="button" id="printBtn">印刷 / PDFとして保存</button>
+      <button type="button" class="secondary" id="exportInvoiceCsvBtn">請求書内容をCSVで書き出す</button>
+      <button type="button" class="secondary" id="resetFormBtn">入力内容をリセット</button>
+    </div>
+  </section>
+
+  <!-- Invoice preview -->
+  <section id="invoicePreviewSection">
+    <div id="invoicePreview">
+      <h2 class="doc-title">請 求 書</h2>
+      <div class="preview-top">
+        <div class="preview-client">
+          <div class="name" id="pvClientName">　</div>
+          <div id="pvClientHonorific">御中</div>
+        </div>
+        <div class="preview-meta">
+          <div>請求書番号: <span id="pvInvoiceNo"></span></div>
+          <div>発行日: <span id="pvIssueDate"></span></div>
+          <div>支払期限: <span id="pvDueDate"></span></div>
+        </div>
+      </div>
+      <div id="pvTitle" style="font-size:0.95rem;margin-bottom:8px;"></div>
+      <div class="preview-total-box">ご請求金額 　<span id="pvGrandTotal">¥0</span>　(税込)</div>
+
+      <table class="invoice-table">
+        <thead>
+          <tr><th>品目</th><th>数量</th><th>単位</th><th>単価</th><th>金額</th></tr>
+        </thead>
+        <tbody id="pvLineItems"></tbody>
+      </table>
+
+      <table class="summary-table">
+        <tr><td>小計</td><td class="num" id="pvSubtotal">¥0</td></tr>
+        <tr><td>消費税(<span id="pvTaxRate">10</span>%)</td><td class="num" id="pvTax">¥0</td></tr>
+        <tr class="grand"><td>合計</td><td class="num" id="pvTotal">¥0</td></tr>
+      </table>
+
+      <div class="preview-footer">
+        <div class="remarks">
+          <div><strong>備考</strong></div>
+          <div id="pvRemarks"></div>
+        </div>
+        <div>
+          <div><strong>お振込先</strong></div>
+          <div id="pvBank" style="white-space:pre-line;"></div>
+        </div>
+      </div>
+
+      <div class="preview-issuer" id="pvIssuer"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="app-footer">
+  すべての処理はこの端末のブラウザ内で行われます。カレンダーデータや請求書の内容が外部サーバーへ送信されることはありません。
+</footer>
+
+<script>
+/* ============================================================
+   Utilities
+   ============================================================ */
+function pad2(n) { return String(n).padStart(2, '0'); }
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+}
+function formatDateLocal(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+}
+function formatTimeLocal(d) {
+  return `${pad2(d.getHours())}-${pad2(d.getMinutes())}`.replace('-', ':');
+}
+function formatTimeLocalFixed(d) {
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+function formatDateJP(iso) {
+  if (!iso) return '';
+  const [y,m,d] = iso.split('-').map(Number);
+  if (!y) return '';
+  return `${y}年${m}月${d}日`;
+}
+function yen(n) {
+  n = Math.round(Number(n) || 0);
+  return '¥' + n.toLocaleString('ja-JP');
+}
+function genId() { return Math.random().toString(36).slice(2, 10); }
+function escapeAttr(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ============================================================
+   ICS parsing (no external dependencies)
+   ============================================================ */
+function unfoldICS(text) {
+  return text.replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '');
+}
+
+function unescapeText(v) {
+  return v.replace(/\\n/gi, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\');
+}
+
+function parseICS(text) {
+  const lines = unfoldICS(text).split('\n').filter(l => l.trim() !== '');
+  const events = [];
+  let cur = null;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (line === 'BEGIN:VEVENT') { cur = {}; continue; }
+    if (line === 'END:VEVENT') { if (cur) events.push(cur); cur = null; continue; }
+    if (!cur) continue;
+    const idx = line.indexOf(':');
+    if (idx === -1) continue;
+    const left = line.slice(0, idx);
+    const value = line.slice(idx + 1);
+    const segments = left.split(';');
+    const name = segments[0].toUpperCase();
+    const params = {};
+    segments.slice(1).forEach(p => {
+      const eq = p.indexOf('=');
+      if (eq === -1) return;
+      params[p.slice(0, eq).toUpperCase()] = p.slice(eq + 1);
+    });
+    switch (name) {
+      case 'DTSTART': cur.dtstart = { value, params }; break;
+      case 'DTEND': cur.dtend = { value, params }; break;
+      case 'DURATION': cur.duration = value; break;
+      case 'RRULE': cur.rrule = value; break;
+      case 'EXDATE':
+        cur.exdate = cur.exdate || [];
+        cur.exdate.push({ value, params });
+        break;
+      case 'SUMMARY': cur.summary = unescapeText(value); break;
+      case 'LOCATION': cur.location = unescapeText(value); break;
+      case 'DESCRIPTION': cur.description = unescapeText(value); break;
+      case 'UID': cur.uid = value; break;
+      case 'STATUS': cur.status = value.trim().toUpperCase(); break;
+      default: break;
+    }
+  }
+  return events;
+}
+
+function tzOffsetMinutes(utcMillis, tzid) {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: tzid, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+  const parts = dtf.formatToParts(new Date(utcMillis));
+  const map = {};
+  parts.forEach(p => { map[p.type] = p.value; });
+  const asUTC = Date.UTC(+map.year, +map.month - 1, +map.day, +map.hour === 24 ? 0 : +map.hour, +map.minute, +map.second);
+  return (asUTC - utcMillis) / 60000;
+}
+
+function zonedTimeToUtc(y, mo, d, h, mi, s, tzid) {
+  let utcGuess = Date.UTC(y, mo, d, h, mi, s);
+  try {
+    for (let i = 0; i < 2; i++) {
+      const offsetMin = tzOffsetMinutes(utcGuess, tzid);
+      utcGuess = Date.UTC(y, mo, d, h, mi, s) - offsetMin * 60000;
+    }
+    return new Date(utcGuess);
+  } catch (e) {
+    return new Date(y, mo, d, h, mi, s);
+  }
+}
+
+function parseDT(value, params) {
+  const isDateOnly = params.VALUE === 'DATE' || /^\d{8}$/.test(value);
+  if (isDateOnly) {
+    const y = +value.slice(0, 4), mo = +value.slice(4, 6), d = +value.slice(6, 8);
+    return { allDay: true, y, mo, d };
+  }
+  const m = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?$/);
+  if (!m) return null;
+  const y = +m[1], mo = +m[2] - 1, d = +m[3], h = +m[4], mi = +m[5], s = +m[6], z = m[7];
+  if (z === 'Z') {
+    return { allDay: false, date: new Date(Date.UTC(y, mo, d, h, mi, s)) };
+  }
+  const tzid = params.TZID;
+  if (tzid) {
+    return { allDay: false, date: zonedTimeToUtc(y, mo, d, h, mi, s, tzid) };
+  }
+  return { allDay: false, date: new Date(y, mo, d, h, mi, s) };
+}
+
+function parseISODuration(v) {
+  const m = v.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/);
+  if (!m) return 0;
+  const days = +(m[1] || 0), hours = +(m[2] || 0), mins = +(m[3] || 0), secs = +(m[4] || 0);
+  return ((days * 24 + hours) * 60 + mins) * 60000 + secs * 1000;
+}
+
+function stripTime(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }
+function minuteKey(d) { return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${d.getMinutes()}`; }
+
+const DAY_MAP = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+
+function parseRRule(rruleStr) {
+  const rule = { freq: null, interval: 1, count: null, until: null, byday: [] };
+  rruleStr.split(';').forEach(p => {
+    const eq = p.indexOf('=');
+    if (eq === -1) return;
+    const k = p.slice(0, eq), v = p.slice(eq + 1);
+    switch (k) {
+      case 'FREQ': rule.freq = v; break;
+      case 'INTERVAL': rule.interval = parseInt(v, 10) || 1; break;
+      case 'COUNT': rule.count = parseInt(v, 10); break;
+      case 'UNTIL': {
+        const info = parseDT(v, {});
+        if (info) rule.until = info.allDay ? new Date(info.y, info.mo - 1, info.d, 23, 59, 59) : info.date;
+        break;
+      }
+      case 'BYDAY': rule.byday = v.split(',').map(s => s.trim()); break;
+      default: break;
+    }
+  });
+  return rule;
+}
+
+const MAX_ITER = 3000;
+
+function expandRecurring(startDate, durationMs, rule, rangeStart, rangeEnd, exSet) {
+  const results = [];
+  const freq = rule.freq;
+  let count = 0;
+
+  if (freq === 'MONTHLY' || freq === 'YEARLY') {
+    let cursor = new Date(startDate);
+    let n = 0;
+    while (n < MAX_ITER) {
+      n++;
+      if (rule.until && cursor > rule.until) break;
+      if (rule.count && count >= rule.count) break;
+      count++;
+      const occEnd = new Date(cursor.getTime() + durationMs);
+      if (cursor < rangeEnd && occEnd > rangeStart && !exSet.has(minuteKey(cursor))) {
+        results.push({ start: new Date(cursor), end: occEnd });
+      }
+      if (cursor > rangeEnd && !rule.count) break;
+      const y = cursor.getFullYear(), mo = cursor.getMonth(), d = cursor.getDate();
+      const h = cursor.getHours(), mi = cursor.getMinutes(), s = cursor.getSeconds();
+      cursor = freq === 'MONTHLY'
+        ? new Date(y, mo + rule.interval, d, h, mi, s)
+        : new Date(y + rule.interval, mo, d, h, mi, s);
+      if (cursor.getDate() !== d) {
+        // overflowed month (e.g. Feb 30) - skip forward to next valid attempt handled by loop
+      }
+    }
+    return results;
+  }
+
+  // DAILY or WEEKLY: day-by-day scan
+  const dow0 = startDate.getDay();
+  const weekStart = new Date(startDate);
+  const mondayOffset = (dow0 === 0) ? -6 : (1 - dow0);
+  weekStart.setDate(weekStart.getDate() + mondayOffset);
+  weekStart.setHours(0, 0, 0, 0);
+  const weekStartMs = weekStart.getTime();
+
+  const targetDays = (rule.byday && rule.byday.length)
+    ? rule.byday.map(s => DAY_MAP[s.slice(-2)]).filter(x => x !== undefined)
+    : [dow0];
+
+  let cursor = new Date(startDate);
+  let n = 0;
+  while (n < MAX_ITER) {
+    n++;
+    if (rule.until && cursor > rule.until) break;
+    let matches = false;
+    if (freq === 'DAILY') {
+      const daysSince = Math.round((stripTime(cursor) - stripTime(startDate)) / 86400000);
+      matches = (daysSince % rule.interval === 0);
+    } else if (freq === 'WEEKLY') {
+      const dow = cursor.getDay();
+      if (targetDays.includes(dow)) {
+        const daysSinceWeekStart = Math.round((stripTime(cursor) - weekStartMs) / 86400000);
+        const weekIndex = Math.floor(daysSinceWeekStart / 7);
+        matches = (weekIndex % rule.interval === 0);
+      }
+    }
+    if (matches) {
+      if (rule.count && count >= rule.count) break;
+      count++;
+      const occEnd = new Date(cursor.getTime() + durationMs);
+      if (cursor < rangeEnd && occEnd > rangeStart && !exSet.has(minuteKey(cursor))) {
+        results.push({ start: new Date(cursor), end: occEnd });
+      }
+    }
+    if (cursor > rangeEnd && (!rule.count || count >= rule.count)) break;
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, cursor.getHours(), cursor.getMinutes(), cursor.getSeconds());
+  }
+  return results;
+}
+
+function expandEventToOccurrences(ev, rangeStart, rangeEnd) {
+  if (!ev.dtstart || ev.status === 'CANCELLED') return [];
+  const startInfo = parseDT(ev.dtstart.value, ev.dtstart.params);
+  if (!startInfo) return [];
+
+  let allDay = startInfo.allDay;
+  let startDate, endDate;
+  if (allDay) {
+    startDate = new Date(startInfo.y, startInfo.mo - 1, startInfo.d);
+    if (ev.dtend) {
+      const endInfo = parseDT(ev.dtend.value, ev.dtend.params);
+      endDate = endInfo ? new Date(endInfo.y, endInfo.mo - 1, endInfo.d) : new Date(startInfo.y, startInfo.mo - 1, startInfo.d + 1);
+    } else {
+      endDate = new Date(startInfo.y, startInfo.mo - 1, startInfo.d + 1);
+    }
+  } else {
+    startDate = startInfo.date;
+    if (ev.dtend) {
+      const endInfo = parseDT(ev.dtend.value, ev.dtend.params);
+      endDate = endInfo ? endInfo.date : startDate;
+    } else if (ev.duration) {
+      endDate = new Date(startDate.getTime() + parseISODuration(ev.duration));
+    } else {
+      endDate = startDate;
+    }
+  }
+  const durationMs = endDate - startDate;
+
+  const exSet = new Set((ev.exdate || []).map(e => {
+    const info = parseDT(e.value, e.params);
+    if (!info) return '';
+    const d = info.allDay ? new Date(info.y, info.mo - 1, info.d) : info.date;
+    return minuteKey(d);
+  }));
+
+  if (!ev.rrule) {
+    if (startDate < rangeEnd && endDate > rangeStart) {
+      return [{ start: startDate, end: endDate, allDay }];
+    }
+    return [];
+  }
+
+  const rule = parseRRule(ev.rrule);
+  if (!rule.freq) {
+    if (startDate < rangeEnd && endDate > rangeStart) return [{ start: startDate, end: endDate, allDay }];
+    return [];
+  }
+  return expandRecurring(startDate, durationMs, rule, rangeStart, rangeEnd, exSet).map(o => ({ ...o, allDay }));
+}
+
+function toInternalEvent(rawEv, occ) {
+  const dateStr = formatDateLocal(occ.start);
+  let startStr = '', endStr = '', hours = 0;
+  if (!occ.allDay) {
+    startStr = formatTimeLocalFixed(occ.start);
+    endStr = formatTimeLocalFixed(occ.end);
+    hours = Math.max(0, (occ.end - occ.start) / 3600000);
+  }
+  return {
+    id: genId(),
+    sourceKey: (rawEv.uid || '') + '|' + occ.start.getTime(),
+    date: dateStr,
+    start: startStr,
+    end: endStr,
+    hours: Math.round(hours * 100) / 100,
+    title: rawEv.summary || '(無題の予定)',
+    memo: rawEv.location || '',
+    allDay: occ.allDay,
+    include: !occ.allDay
+  };
+}
+
+/* ============================================================
+   Timesheet state
+   ============================================================ */
+let events = loadEvents();
+
+function loadEvents() {
+  try {
+    const raw = localStorage.getItem('ts_events');
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function saveEvents() {
+  try { localStorage.setItem('ts_events', JSON.stringify(events)); } catch (e) {}
+}
+
+function setImportStatus(msg, isError) {
+  const el = document.getElementById('importStatus');
+  el.textContent = msg;
+  el.className = isError ? 'error' : 'ok';
+}
+
+function renderTimesheet() {
+  events.sort((a, b) => (a.date + (a.start || '')).localeCompare(b.date + (b.start || '')));
+  const tbody = document.getElementById('tsBody');
+  tbody.innerHTML = '';
+  events.forEach((ev, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="col-chk"><input type="checkbox" ${ev.include ? 'checked' : ''} data-field="include" data-idx="${idx}"></td>
+      <td><input type="date" value="${escapeAttr(ev.date)}" data-field="date" data-idx="${idx}"></td>
+      <td><input type="time" value="${escapeAttr(ev.start)}" data-field="start" data-idx="${idx}"></td>
+      <td><input type="time" value="${escapeAttr(ev.end)}" data-field="end" data-idx="${idx}"></td>
+      <td><input type="number" step="0.25" min="0" class="num" value="${ev.hours}" data-field="hours" data-idx="${idx}"></td>
+      <td><input type="text" value="${escapeAttr(ev.title)}" data-field="title" data-idx="${idx}"></td>
+      <td><input type="text" value="${escapeAttr(ev.memo)}" data-field="memo" data-idx="${idx}"></td>
+      <td class="col-del"><button type="button" class="del-btn" data-idx="${idx}">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('tsCount').textContent = events.length;
+  updateTotalDisplay();
+  saveEvents();
+}
+
+function updateTotalDisplay() {
+  let total = 0;
+  events.forEach(ev => { if (ev.include) total += Number(ev.hours) || 0; });
+  document.getElementById('tsTotal').textContent = total.toFixed(2);
+  refreshInvoiceHoursHint(total);
+}
+
+document.getElementById('tsBody').addEventListener('input', e => {
+  const idx = e.target.dataset.idx;
+  const field = e.target.dataset.field;
+  if (idx === undefined || !field || field === 'include') return;
+  const ev = events[idx];
+  if (!ev) return;
+  if (field === 'hours') {
+    ev.hours = parseFloat(e.target.value) || 0;
+  } else {
+    ev[field] = e.target.value;
+    if (field === 'start' || field === 'end') {
+      if (ev.start && ev.end) {
+        const s = new Date(`1970-01-01T${ev.start}:00`);
+        let en = new Date(`1970-01-01T${ev.end}:00`);
+        if (en < s) en = new Date(en.getTime() + 86400000);
+        const diff = (en - s) / 3600000;
+        ev.hours = Math.round(diff * 100) / 100;
+        const row = e.target.closest('tr');
+        const hoursInput = row.querySelector('input[data-field="hours"]');
+        if (hoursInput) hoursInput.value = ev.hours;
+      }
+    }
+  }
+  saveEvents();
+  updateTotalDisplay();
+});
+
+document.getElementById('tsBody').addEventListener('change', e => {
+  if (e.target.dataset.field === 'include') {
+    const idx = e.target.dataset.idx;
+    events[idx].include = e.target.checked;
+    saveEvents();
+    updateTotalDisplay();
+  }
+});
+
+document.getElementById('tsBody').addEventListener('click', e => {
+  if (e.target.classList.contains('del-btn')) {
+    events.splice(Number(e.target.dataset.idx), 1);
+    renderTimesheet();
+  }
+});
+
+document.getElementById('addRowBtn').addEventListener('click', () => {
+  events.push({ id: genId(), sourceKey: '', date: todayStr(), start: '', end: '', hours: 0, title: '', memo: '', allDay: false, include: true });
+  renderTimesheet();
+});
+document.getElementById('checkAllBtn').addEventListener('click', () => { events.forEach(e => e.include = true); renderTimesheet(); });
+document.getElementById('uncheckAllBtn').addEventListener('click', () => { events.forEach(e => e.include = false); renderTimesheet(); });
+
+document.getElementById('importBtn').addEventListener('click', async () => {
+  const files = document.getElementById('icsFiles').files;
+  if (!files || !files.length) { setImportStatus('ICSファイルを選択してください', true); return; }
+  const fromVal = document.getElementById('rangeFrom').value;
+  const toVal = document.getElementById('rangeTo').value;
+  if (!fromVal || !toVal) { setImportStatus('対象期間を指定してください', true); return; }
+  const rangeStart = new Date(`${fromVal}T00:00:00`);
+  const rangeEnd = new Date(`${toVal}T23:59:59.999`);
+  const excludeKeywords = document.getElementById('excludeKeywords').value.split(',').map(s => s.trim()).filter(Boolean);
+  const existingKeys = new Set(events.map(e => e.sourceKey).filter(Boolean));
+
+  let addedCount = 0, skippedCount = 0, errorCount = 0;
+  for (const file of files) {
+    try {
+      const text = await file.text();
+      const rawEvents = parseICS(text);
+      rawEvents.forEach(re => {
+        try {
+          const occs = expandEventToOccurrences(re, rangeStart, rangeEnd);
+          occs.forEach(occ => {
+            const internal = toInternalEvent(re, occ);
+            if (existingKeys.has(internal.sourceKey)) { skippedCount++; return; }
+            existingKeys.add(internal.sourceKey);
+            if (excludeKeywords.some(k => internal.title.includes(k))) internal.include = false;
+            events.push(internal);
+            addedCount++;
+          });
+        } catch (err) { errorCount++; console.warn('event skipped', err); }
+      });
+    } catch (err) {
+      errorCount++;
+      console.warn('file skipped', err);
+    }
+  }
+  renderTimesheet();
+  let msg = `${addedCount}件の予定を取り込みました。`;
+  if (skippedCount) msg += `(重複 ${skippedCount}件はスキップ)`;
+  if (errorCount) msg += `(${errorCount}件は解析エラーのためスキップ)`;
+  setImportStatus(msg, false);
+});
+
+function downloadCSV(filename, rows) {
+  const csvEscape = v => {
+    v = (v === undefined || v === null) ? '' : String(v);
+    if (/[",\n\r]/.test(v)) v = '"' + v.replace(/"/g, '""') + '"';
+    return v;
+  };
+  const csv = rows.map(r => r.map(csvEscape).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('exportCsvBtn').addEventListener('click', () => {
+  const included = events.filter(e => e.include);
+  const rows = [['日付', '開始', '終了', '作業時間(h)', '件名', '備考']];
+  included.forEach(e => rows.push([e.date, e.start, e.end, e.hours, e.title, e.memo]));
+  const total = included.reduce((s, e) => s + (Number(e.hours) || 0), 0);
+  rows.push([]);
+  rows.push(['', '', '', total.toFixed(2), '合計', '']);
+  downloadCSV(`作業時間表_${todayStr()}.csv`, rows);
+});
+
+/* ============================================================
+   Invoice state
+   ============================================================ */
+const defaultInvoiceForm = {
+  issuerName: '', issuerZip: '', issuerAddress: '', issuerTel: '', issuerEmail: '', issuerRegNo: '',
+  bankName: '', bankBranch: '', bankAccountType: '普通', bankAccountNo: '', bankAccountHolder: '',
+  clientName: '', clientHonorific: '御中',
+  invoiceNo: '', issueDate: todayStr(), dueDate: '', invoiceTitle: '',
+  taxRate: 10,
+  lineItems: [{ name: '作業時間(時給制)', qty: 0, unit: '時間', unitPrice: 0 }],
+  remarks: ''
+};
+
+function loadInvoiceForm() {
+  try {
+    const raw = localStorage.getItem('ts_invoice_form');
+    if (!raw) return JSON.parse(JSON.stringify(defaultInvoiceForm));
+    const parsed = JSON.parse(raw);
+    return Object.assign(JSON.parse(JSON.stringify(defaultInvoiceForm)), parsed);
+  } catch (e) { return JSON.parse(JSON.stringify(defaultInvoiceForm)); }
+}
+function saveInvoiceForm() {
+  try { localStorage.setItem('ts_invoice_form', JSON.stringify(invoiceForm)); } catch (e) {}
+}
+
+let invoiceForm = loadInvoiceForm();
+
+const simpleFieldIds = ['issuerName','issuerZip','issuerAddress','issuerTel','issuerEmail','issuerRegNo',
+  'bankName','bankBranch','bankAccountType','bankAccountNo','bankAccountHolder',
+  'clientName','clientHonorific','invoiceNo','issueDate','dueDate','invoiceTitle','taxRate','remarks'];
+
+function bindFormToState() {
+  simpleFieldIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = invoiceForm[id];
+    el.addEventListener('input', () => {
+      invoiceForm[id] = (id === 'taxRate') ? (parseFloat(el.value) || 0) : el.value;
+      saveInvoiceForm();
+      renderInvoicePreview();
+    });
+    el.addEventListener('change', () => {
+      invoiceForm[id] = (id === 'taxRate') ? (parseFloat(el.value) || 0) : el.value;
+      saveInvoiceForm();
+      renderInvoicePreview();
+    });
+  });
+}
+
+function renderLineItems() {
+  const tbody = document.getElementById('lineItemsBody');
+  tbody.innerHTML = '';
+  invoiceForm.lineItems.forEach((li, idx) => {
+    const amount = (Number(li.qty) || 0) * (Number(li.unitPrice) || 0);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" value="${escapeAttr(li.name)}" data-field="name" data-idx="${idx}"></td>
+      <td><input type="number" step="0.25" class="num" value="${li.qty}" data-field="qty" data-idx="${idx}"></td>
+      <td><input type="text" value="${escapeAttr(li.unit)}" data-field="unit" data-idx="${idx}"></td>
+      <td><input type="number" step="1" class="num" value="${li.unitPrice}" data-field="unitPrice" data-idx="${idx}"></td>
+      <td class="num">${yen(amount)}</td>
+      <td class="col-del"><button type="button" class="del-btn" data-idx="${idx}">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  renderInvoicePreview();
+}
+
+document.getElementById('lineItemsBody').addEventListener('input', e => {
+  const idx = e.target.dataset.idx, field = e.target.dataset.field;
+  if (idx === undefined || !field) return;
+  const li = invoiceForm.lineItems[idx];
+  if (field === 'qty' || field === 'unitPrice') li[field] = parseFloat(e.target.value) || 0;
+  else li[field] = e.target.value;
+  saveInvoiceForm();
+  renderLineItems();
+});
+document.getElementById('lineItemsBody').addEventListener('click', e => {
+  if (e.target.classList.contains('del-btn')) {
+    invoiceForm.lineItems.splice(Number(e.target.dataset.idx), 1);
+    saveInvoiceForm();
+    renderLineItems();
+  }
+});
+document.getElementById('addLineBtn').addEventListener('click', () => {
+  invoiceForm.lineItems.push({ name: '', qty: 1, unit: '式', unitPrice: 0 });
+  saveInvoiceForm();
+  renderLineItems();
+});
+
+function refreshInvoiceHoursHint(total) {
+  const el = document.getElementById('hoursHint');
+  if (el) el.textContent = (total === undefined ? currentIncludedHours() : total).toFixed(2);
+}
+function currentIncludedHours() {
+  return events.filter(e => e.include).reduce((s, e) => s + (Number(e.hours) || 0), 0);
+}
+
+document.getElementById('applyHoursBtn').addEventListener('click', () => {
+  if (!invoiceForm.lineItems.length) invoiceForm.lineItems.push({ name: '作業時間(時給制)', qty: 0, unit: '時間', unitPrice: 0 });
+  invoiceForm.lineItems[0].qty = Math.round(currentIncludedHours() * 100) / 100;
+  saveInvoiceForm();
+  renderLineItems();
+});
+
+function computeTotals() {
+  const subtotal = invoiceForm.lineItems.reduce((s, li) => s + (Number(li.qty) || 0) * (Number(li.unitPrice) || 0), 0);
+  const tax = Math.round(subtotal * (Number(invoiceForm.taxRate) || 0) / 100);
+  const total = subtotal + tax;
+  return { subtotal, tax, total };
+}
+
+function renderInvoicePreview() {
+  document.getElementById('pvClientName').textContent = invoiceForm.clientName || '　';
+  document.getElementById('pvClientHonorific').textContent = invoiceForm.clientHonorific || '';
+  document.getElementById('pvInvoiceNo').textContent = invoiceForm.invoiceNo || '(未設定)';
+  document.getElementById('pvIssueDate').textContent = formatDateJP(invoiceForm.issueDate);
+  document.getElementById('pvDueDate').textContent = formatDateJP(invoiceForm.dueDate);
+  document.getElementById('pvTitle').textContent = invoiceForm.invoiceTitle || '';
+
+  const tbody = document.getElementById('pvLineItems');
+  tbody.innerHTML = '';
+  invoiceForm.lineItems.forEach(li => {
+    const amount = (Number(li.qty) || 0) * (Number(li.unitPrice) || 0);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${escapeHtml(li.name)}</td><td class="num">${Number(li.qty) || 0}</td><td>${escapeHtml(li.unit)}</td><td class="num">${yen(li.unitPrice)}</td><td class="num">${yen(amount)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  const { subtotal, tax, total } = computeTotals();
+  document.getElementById('pvSubtotal').textContent = yen(subtotal);
+  document.getElementById('pvTaxRate').textContent = invoiceForm.taxRate;
+  document.getElementById('pvTax').textContent = yen(tax);
+  document.getElementById('pvTotal').textContent = yen(total);
+  document.getElementById('pvGrandTotal').textContent = yen(total);
+
+  document.getElementById('pvRemarks').textContent = invoiceForm.remarks || '';
+
+  const bankLines = [];
+  if (invoiceForm.bankName) bankLines.push(`${invoiceForm.bankName} ${invoiceForm.bankBranch || ''}`.trim());
+  if (invoiceForm.bankAccountType || invoiceForm.bankAccountNo) bankLines.push(`${invoiceForm.bankAccountType || ''} ${invoiceForm.bankAccountNo || ''}`.trim());
+  if (invoiceForm.bankAccountHolder) bankLines.push(invoiceForm.bankAccountHolder);
+  document.getElementById('pvBank').textContent = bankLines.join('\n');
+
+  const issuerLines = [];
+  if (invoiceForm.issuerName) issuerLines.push(invoiceForm.issuerName);
+  if (invoiceForm.issuerZip) issuerLines.push(`〒${invoiceForm.issuerZip}`);
+  if (invoiceForm.issuerAddress) issuerLines.push(invoiceForm.issuerAddress);
+  if (invoiceForm.issuerTel) issuerLines.push(`TEL: ${invoiceForm.issuerTel}`);
+  if (invoiceForm.issuerEmail) issuerLines.push(invoiceForm.issuerEmail);
+  if (invoiceForm.issuerRegNo) issuerLines.push(`登録番号: ${invoiceForm.issuerRegNo}`);
+  document.getElementById('pvIssuer').textContent = issuerLines.join('\n');
+}
+
+document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+document.getElementById('exportInvoiceCsvBtn').addEventListener('click', () => {
+  const { subtotal, tax, total } = computeTotals();
+  const rows = [
+    ['請求書番号', invoiceForm.invoiceNo],
+    ['発行日', invoiceForm.issueDate],
+    ['支払期限', invoiceForm.dueDate],
+    ['請求先', `${invoiceForm.clientName} ${invoiceForm.clientHonorific}`],
+    ['発行者', invoiceForm.issuerName],
+    [],
+    ['品目', '数量', '単位', '単価', '金額']
+  ];
+  invoiceForm.lineItems.forEach(li => rows.push([li.name, li.qty, li.unit, li.unitPrice, (Number(li.qty)||0)*(Number(li.unitPrice)||0)]));
+  rows.push([]);
+  rows.push(['', '', '', '小計', subtotal]);
+  rows.push(['', '', '', `消費税(${invoiceForm.taxRate}%)`, tax]);
+  rows.push(['', '', '', '合計', total]);
+  downloadCSV(`請求書_${invoiceForm.invoiceNo || todayStr()}.csv`, rows);
+});
+
+document.getElementById('resetFormBtn').addEventListener('click', () => {
+  if (!confirm('請求書の入力内容をリセットしますか?(作業時間表は消えません)')) return;
+  invoiceForm = JSON.parse(JSON.stringify(defaultInvoiceForm));
+  invoiceForm.issueDate = todayStr();
+  saveInvoiceForm();
+  bindFormToState();
+  renderLineItems();
+});
+
+/* ============================================================
+   Init
+   ============================================================ */
+(function init() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  document.getElementById('rangeFrom').value = formatDateLocal(first);
+  document.getElementById('rangeTo').value = formatDateLocal(last);
+
+  if (!invoiceForm.dueDate) {
+    const due = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+    invoiceForm.dueDate = formatDateLocal(due);
+  }
+
+  bindFormToState();
+  renderLineItems();
+  renderTimesheet();
+})();
+</script>
+</body>
+</html>
