@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>作業時間表・請求書ジェネレーター</title>
+<title>作業時間表ジェネレーター</title>
 <style>
   :root {
     --border: #d8dce1;
@@ -82,8 +82,6 @@
   button.secondary { background: #fff; color: var(--accent); }
   button.secondary:hover { background: #eef3fb; }
   button.small { padding: 4px 10px; font-size: 0.8rem; }
-  button.link-btn { background: none; border: none; color: var(--accent); padding: 2px 4px; text-decoration: underline; }
-  button.link-btn:hover { background: none; color: var(--accent-dark); }
   #importStatus { font-size: 0.85rem; margin-top: 8px; }
   #importStatus.error { color: var(--danger); }
   #importStatus.ok { color: #1e7e34; }
@@ -105,53 +103,14 @@
   .total-line { margin-top: 12px; font-size: 0.95rem; display: flex; gap: 24px; align-items: center; }
   .total-line strong { font-size: 1.1rem; }
   .btn-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-  .two-col h3 { font-size: 0.9rem; margin: 0 0 8px; color: var(--muted); border-bottom: 1px solid var(--border); padding-bottom: 4px; }
-  .hint-box { background: #eef3fb; border: 1px solid #c9dbf2; border-radius: 6px; padding: 8px 12px; font-size: 0.82rem; color: #234880; margin-top: 8px; }
   .help-note { font-size: 0.78rem; color: var(--muted); margin-top: 6px; }
-  #invoicePreview {
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 32px;
-    margin-top: 20px;
-    max-width: 780px;
-  }
-  #invoicePreview h2.doc-title { text-align: center; font-size: 1.6rem; letter-spacing: 0.3em; margin: 0 0 24px; }
-  .preview-top { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
-  .preview-client { font-size: 1.05rem; }
-  .preview-client .name { font-size: 1.2rem; border-bottom: 2px solid var(--text); display: inline-block; padding-bottom: 2px; }
-  .preview-meta { font-size: 0.85rem; text-align: right; }
-  .preview-meta div { margin-bottom: 2px; }
-  .preview-issuer { margin-top: 24px; font-size: 0.85rem; text-align: right; white-space: pre-line; }
-  .preview-total-box { border: 2px solid var(--text); display: inline-block; padding: 8px 20px; font-size: 1.15rem; margin: 12px 0 24px; }
-  table.invoice-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 8px; }
-  table.invoice-table th, table.invoice-table td { border: 1px solid var(--text); padding: 6px 8px; }
-  table.invoice-table th { background: #f0f0f0; }
-  table.invoice-table td.num { text-align: right; }
-  .summary-table { margin-left: auto; width: 260px; border-collapse: collapse; font-size: 0.9rem; margin-top: 8px; }
-  .summary-table td { padding: 4px 8px; border: 1px solid var(--border); }
-  .summary-table td.num { text-align: right; }
-  .summary-table tr.grand td { font-weight: bold; font-size: 1.05rem; }
-  .preview-footer { display: flex; justify-content: space-between; margin-top: 24px; font-size: 0.82rem; }
-  .preview-footer .remarks { max-width: 55%; white-space: pre-line; }
   footer.app-footer { text-align: center; color: var(--muted); font-size: 0.78rem; padding: 24px 16px; }
-
-  @media print {
-    body { background: #fff; }
-    header.app-header, footer.app-footer, .no-print { display: none !important; }
-    main { max-width: none; padding: 0; }
-    section.panel { display: none !important; }
-    #invoicePreviewSection { display: block !important; border: none; }
-    #invoicePreview { box-shadow: none; border: none; margin: 0 auto; max-width: 100%; padding: 0; }
-    @page { size: A4; margin: 18mm; }
-  }
 </style>
 </head>
 <body>
 <header class="app-header">
-  <h1>作業時間表・請求書ジェネレーター</h1>
-  <p>Googleカレンダーのエクスポート(ICS)を取り込み、作業時間表と請求書を作成します。すべての処理はブラウザ内で完結し、データはどこにも送信されません(入力内容はこの端末のブラウザにのみ保存されます)。</p>
+  <h1>作業時間表ジェネレーター</h1>
+  <p>Googleカレンダーのエクスポート(ICS)を取り込み、提出用の作業時間表(月間タイムシート)を作成します。すべての処理はブラウザ内で完結し、データはどこにも送信されません(入力内容はこの端末のブラウザにのみ保存されます)。</p>
 </header>
 
 <main>
@@ -196,7 +155,7 @@
   <!-- STEP 2: timesheet -->
   <section class="panel" id="step2">
     <h2><span class="step-no">2</span>作業時間表を確認・編集する</h2>
-    <p class="desc">「含める」にチェックした行が作業時間の合計と請求書の作業時間に反映されます。開始・終了時刻を変更すると作業時間が自動再計算されます。</p>
+    <p class="desc">「含める」にチェックした行が作業時間の合計と月間タイムシートの作業時間に反映されます。開始・終了時刻を変更すると作業時間が自動再計算されます。</p>
     <div class="table-wrap">
       <table class="editable">
         <thead>
@@ -272,142 +231,10 @@
       <button type="button" id="exportGridCsvBtn">月間タイムシートをCSVで書き出す</button>
     </div>
   </section>
-
-  <!-- STEP 4: invoice -->
-  <section class="panel" id="step3">
-    <h2><span class="step-no">4</span>請求書を作成する</h2>
-    <p class="desc">時給制(作業時間 × 単価)で金額を計算します。入力内容はこの端末のブラウザに自動保存されます。</p>
-
-    <div class="two-col">
-      <div>
-        <h3>発行者情報(あなた)</h3>
-        <div class="field"><label for="issuerName">氏名 / 会社名</label><input type="text" id="issuerName"></div>
-        <div class="field"><label for="issuerZip">郵便番号</label><input type="text" id="issuerZip" placeholder="000-0000"></div>
-        <div class="field"><label for="issuerAddress">住所</label><input type="text" id="issuerAddress"></div>
-        <div class="field"><label for="issuerTel">電話番号</label><input type="text" id="issuerTel"></div>
-        <div class="field"><label for="issuerEmail">メールアドレス</label><input type="text" id="issuerEmail"></div>
-        <div class="field"><label for="issuerRegNo">適格請求書発行事業者登録番号(任意)</label><input type="text" id="issuerRegNo" placeholder="T0000000000000"></div>
-      </div>
-      <div>
-        <h3>請求先</h3>
-        <div class="field"><label for="clientName">宛先名</label><input type="text" id="clientName" placeholder="株式会社◯◯"></div>
-        <div class="field"><label for="clientHonorific">敬称</label>
-          <select id="clientHonorific">
-            <option value="御中">御中</option>
-            <option value="様">様</option>
-          </select>
-        </div>
-        <div class="field"><label for="invoiceNo">請求書番号</label><input type="text" id="invoiceNo"></div>
-        <div class="field"><label for="issueDate">発行日</label><input type="date" id="issueDate"></div>
-        <div class="field"><label for="dueDate">支払期限</label><input type="date" id="dueDate"></div>
-        <div class="field"><label for="invoiceTitle">件名</label><input type="text" id="invoiceTitle" placeholder="例: 2026年9月分 作業料"></div>
-      </div>
-    </div>
-
-    <h3 style="margin-top:20px;">明細</h3>
-    <div class="hint-box">
-      作業時間表の現在の合計: <strong id="hoursHint">0.00</strong> 時間
-      <button type="button" class="link-btn" id="applyHoursBtn">→ 1行目の数量にこの時間数を反映</button>
-    </div>
-    <div class="table-wrap" style="margin-top:8px;">
-      <table class="editable" id="lineItemsTable">
-        <thead>
-          <tr>
-            <th>品目</th>
-            <th style="width:90px;">数量</th>
-            <th style="width:70px;">単位</th>
-            <th style="width:110px;">単価(円)</th>
-            <th style="width:120px;">金額(円)</th>
-            <th class="col-del"></th>
-          </tr>
-        </thead>
-        <tbody id="lineItemsBody"></tbody>
-      </table>
-    </div>
-    <div class="btn-row">
-      <button type="button" class="secondary small" id="addLineBtn">＋ 明細行を追加</button>
-    </div>
-
-    <div class="field-row" style="margin-top:16px;">
-      <div class="field"><label for="taxRate">消費税率(%)</label><input type="number" id="taxRate" step="1" min="0" style="width:80px;"></div>
-    </div>
-
-    <div class="two-col" style="margin-top:16px;">
-      <div>
-        <h3>振込先</h3>
-        <div class="field"><label for="bankName">金融機関名</label><input type="text" id="bankName"></div>
-        <div class="field"><label for="bankBranch">支店名</label><input type="text" id="bankBranch"></div>
-        <div class="field"><label for="bankAccountType">口座種別</label>
-          <select id="bankAccountType">
-            <option value="普通">普通</option>
-            <option value="当座">当座</option>
-          </select>
-        </div>
-        <div class="field"><label for="bankAccountNo">口座番号</label><input type="text" id="bankAccountNo"></div>
-        <div class="field"><label for="bankAccountHolder">口座名義</label><input type="text" id="bankAccountHolder"></div>
-      </div>
-      <div>
-        <h3>備考</h3>
-        <div class="field"><textarea id="remarks" rows="6" placeholder="振込手数料は貴社にてご負担いただけますと幸いです。"></textarea></div>
-      </div>
-    </div>
-
-    <div class="btn-row">
-      <button type="button" id="printBtn">印刷 / PDFとして保存</button>
-      <button type="button" class="secondary" id="exportInvoiceCsvBtn">請求書内容をCSVで書き出す</button>
-      <button type="button" class="secondary" id="resetFormBtn">入力内容をリセット</button>
-    </div>
-  </section>
-
-  <!-- Invoice preview -->
-  <section id="invoicePreviewSection">
-    <div id="invoicePreview">
-      <h2 class="doc-title">請 求 書</h2>
-      <div class="preview-top">
-        <div class="preview-client">
-          <div class="name" id="pvClientName">　</div>
-          <div id="pvClientHonorific">御中</div>
-        </div>
-        <div class="preview-meta">
-          <div>請求書番号: <span id="pvInvoiceNo"></span></div>
-          <div>発行日: <span id="pvIssueDate"></span></div>
-          <div>支払期限: <span id="pvDueDate"></span></div>
-        </div>
-      </div>
-      <div id="pvTitle" style="font-size:0.95rem;margin-bottom:8px;"></div>
-      <div class="preview-total-box">ご請求金額 　<span id="pvGrandTotal">¥0</span>　(税込)</div>
-
-      <table class="invoice-table">
-        <thead>
-          <tr><th>品目</th><th>数量</th><th>単位</th><th>単価</th><th>金額</th></tr>
-        </thead>
-        <tbody id="pvLineItems"></tbody>
-      </table>
-
-      <table class="summary-table">
-        <tr><td>小計</td><td class="num" id="pvSubtotal">¥0</td></tr>
-        <tr><td>消費税(<span id="pvTaxRate">10</span>%)</td><td class="num" id="pvTax">¥0</td></tr>
-        <tr class="grand"><td>合計</td><td class="num" id="pvTotal">¥0</td></tr>
-      </table>
-
-      <div class="preview-footer">
-        <div class="remarks">
-          <div><strong>備考</strong></div>
-          <div id="pvRemarks"></div>
-        </div>
-        <div>
-          <div><strong>お振込先</strong></div>
-          <div id="pvBank" style="white-space:pre-line;"></div>
-        </div>
-      </div>
-
-      <div class="preview-issuer" id="pvIssuer"></div>
-    </div>
-  </section>
 </main>
 
 <footer class="app-footer">
-  すべての処理はこの端末のブラウザ内で行われます。カレンダーデータや請求書の内容が外部サーバーへ送信されることはありません。
+  すべての処理はこの端末のブラウザ内で行われます。カレンダーデータが外部サーバーへ送信されることはありません。
 </footer>
 
 <script>
@@ -422,28 +249,12 @@ function todayStr() {
 function formatDateLocal(d) {
   return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
 }
-function formatTimeLocal(d) {
-  return `${pad2(d.getHours())}-${pad2(d.getMinutes())}`.replace('-', ':');
-}
 function formatTimeLocalFixed(d) {
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
-function formatDateJP(iso) {
-  if (!iso) return '';
-  const [y,m,d] = iso.split('-').map(Number);
-  if (!y) return '';
-  return `${y}年${m}月${d}日`;
-}
-function yen(n) {
-  n = Math.round(Number(n) || 0);
-  return '¥' + n.toLocaleString('ja-JP');
 }
 function genId() { return Math.random().toString(36).slice(2, 10); }
 function escapeAttr(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-function escapeHtml(s) {
-  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 /* ============================================================
@@ -772,7 +583,6 @@ function updateTotalDisplay() {
   let total = 0;
   events.forEach(ev => { if (ev.include) total += Number(ev.hours) || 0; });
   document.getElementById('tsTotal').textContent = total.toFixed(2);
-  refreshInvoiceHoursHint(total);
   if (typeof renderMonthGrid === 'function') renderMonthGrid();
 }
 
@@ -1057,190 +867,6 @@ document.getElementById('exportGridCsvBtn').addEventListener('click', () => {
 });
 
 /* ============================================================
-   Invoice state
-   ============================================================ */
-const defaultInvoiceForm = {
-  issuerName: '', issuerZip: '', issuerAddress: '', issuerTel: '', issuerEmail: '', issuerRegNo: '',
-  bankName: '', bankBranch: '', bankAccountType: '普通', bankAccountNo: '', bankAccountHolder: '',
-  clientName: '', clientHonorific: '御中',
-  invoiceNo: '', issueDate: todayStr(), dueDate: '', invoiceTitle: '',
-  taxRate: 10,
-  lineItems: [{ name: '作業時間(時給制)', qty: 0, unit: '時間', unitPrice: 0 }],
-  remarks: ''
-};
-
-function loadInvoiceForm() {
-  try {
-    const raw = localStorage.getItem('ts_invoice_form');
-    if (!raw) return JSON.parse(JSON.stringify(defaultInvoiceForm));
-    const parsed = JSON.parse(raw);
-    return Object.assign(JSON.parse(JSON.stringify(defaultInvoiceForm)), parsed);
-  } catch (e) { return JSON.parse(JSON.stringify(defaultInvoiceForm)); }
-}
-function saveInvoiceForm() {
-  try { localStorage.setItem('ts_invoice_form', JSON.stringify(invoiceForm)); } catch (e) {}
-}
-
-let invoiceForm = loadInvoiceForm();
-
-const simpleFieldIds = ['issuerName','issuerZip','issuerAddress','issuerTel','issuerEmail','issuerRegNo',
-  'bankName','bankBranch','bankAccountType','bankAccountNo','bankAccountHolder',
-  'clientName','clientHonorific','invoiceNo','issueDate','dueDate','invoiceTitle','taxRate','remarks'];
-
-function bindFormToState() {
-  simpleFieldIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.value = invoiceForm[id];
-    el.addEventListener('input', () => {
-      invoiceForm[id] = (id === 'taxRate') ? (parseFloat(el.value) || 0) : el.value;
-      saveInvoiceForm();
-      renderInvoicePreview();
-    });
-    el.addEventListener('change', () => {
-      invoiceForm[id] = (id === 'taxRate') ? (parseFloat(el.value) || 0) : el.value;
-      saveInvoiceForm();
-      renderInvoicePreview();
-    });
-  });
-}
-
-function renderLineItems() {
-  const tbody = document.getElementById('lineItemsBody');
-  tbody.innerHTML = '';
-  invoiceForm.lineItems.forEach((li, idx) => {
-    const amount = (Number(li.qty) || 0) * (Number(li.unitPrice) || 0);
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input type="text" value="${escapeAttr(li.name)}" data-field="name" data-idx="${idx}"></td>
-      <td><input type="number" step="0.25" class="num" value="${li.qty}" data-field="qty" data-idx="${idx}"></td>
-      <td><input type="text" value="${escapeAttr(li.unit)}" data-field="unit" data-idx="${idx}"></td>
-      <td><input type="number" step="1" class="num" value="${li.unitPrice}" data-field="unitPrice" data-idx="${idx}"></td>
-      <td class="num">${yen(amount)}</td>
-      <td class="col-del"><button type="button" class="del-btn" data-idx="${idx}">✕</button></td>
-    `;
-    tbody.appendChild(tr);
-  });
-  renderInvoicePreview();
-}
-
-document.getElementById('lineItemsBody').addEventListener('input', e => {
-  const idx = e.target.dataset.idx, field = e.target.dataset.field;
-  if (idx === undefined || !field) return;
-  const li = invoiceForm.lineItems[idx];
-  if (field === 'qty' || field === 'unitPrice') li[field] = parseFloat(e.target.value) || 0;
-  else li[field] = e.target.value;
-  saveInvoiceForm();
-  renderLineItems();
-});
-document.getElementById('lineItemsBody').addEventListener('click', e => {
-  if (e.target.classList.contains('del-btn')) {
-    invoiceForm.lineItems.splice(Number(e.target.dataset.idx), 1);
-    saveInvoiceForm();
-    renderLineItems();
-  }
-});
-document.getElementById('addLineBtn').addEventListener('click', () => {
-  invoiceForm.lineItems.push({ name: '', qty: 1, unit: '式', unitPrice: 0 });
-  saveInvoiceForm();
-  renderLineItems();
-});
-
-function refreshInvoiceHoursHint(total) {
-  const el = document.getElementById('hoursHint');
-  if (el) el.textContent = (total === undefined ? currentIncludedHours() : total).toFixed(2);
-}
-function currentIncludedHours() {
-  return events.filter(e => e.include).reduce((s, e) => s + (Number(e.hours) || 0), 0);
-}
-
-document.getElementById('applyHoursBtn').addEventListener('click', () => {
-  if (!invoiceForm.lineItems.length) invoiceForm.lineItems.push({ name: '作業時間(時給制)', qty: 0, unit: '時間', unitPrice: 0 });
-  invoiceForm.lineItems[0].qty = Math.round(currentIncludedHours() * 100) / 100;
-  saveInvoiceForm();
-  renderLineItems();
-});
-
-function computeTotals() {
-  const subtotal = invoiceForm.lineItems.reduce((s, li) => s + (Number(li.qty) || 0) * (Number(li.unitPrice) || 0), 0);
-  const tax = Math.round(subtotal * (Number(invoiceForm.taxRate) || 0) / 100);
-  const total = subtotal + tax;
-  return { subtotal, tax, total };
-}
-
-function renderInvoicePreview() {
-  document.getElementById('pvClientName').textContent = invoiceForm.clientName || '　';
-  document.getElementById('pvClientHonorific').textContent = invoiceForm.clientHonorific || '';
-  document.getElementById('pvInvoiceNo').textContent = invoiceForm.invoiceNo || '(未設定)';
-  document.getElementById('pvIssueDate').textContent = formatDateJP(invoiceForm.issueDate);
-  document.getElementById('pvDueDate').textContent = formatDateJP(invoiceForm.dueDate);
-  document.getElementById('pvTitle').textContent = invoiceForm.invoiceTitle || '';
-
-  const tbody = document.getElementById('pvLineItems');
-  tbody.innerHTML = '';
-  invoiceForm.lineItems.forEach(li => {
-    const amount = (Number(li.qty) || 0) * (Number(li.unitPrice) || 0);
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${escapeHtml(li.name)}</td><td class="num">${Number(li.qty) || 0}</td><td>${escapeHtml(li.unit)}</td><td class="num">${yen(li.unitPrice)}</td><td class="num">${yen(amount)}</td>`;
-    tbody.appendChild(tr);
-  });
-
-  const { subtotal, tax, total } = computeTotals();
-  document.getElementById('pvSubtotal').textContent = yen(subtotal);
-  document.getElementById('pvTaxRate').textContent = invoiceForm.taxRate;
-  document.getElementById('pvTax').textContent = yen(tax);
-  document.getElementById('pvTotal').textContent = yen(total);
-  document.getElementById('pvGrandTotal').textContent = yen(total);
-
-  document.getElementById('pvRemarks').textContent = invoiceForm.remarks || '';
-
-  const bankLines = [];
-  if (invoiceForm.bankName) bankLines.push(`${invoiceForm.bankName} ${invoiceForm.bankBranch || ''}`.trim());
-  if (invoiceForm.bankAccountType || invoiceForm.bankAccountNo) bankLines.push(`${invoiceForm.bankAccountType || ''} ${invoiceForm.bankAccountNo || ''}`.trim());
-  if (invoiceForm.bankAccountHolder) bankLines.push(invoiceForm.bankAccountHolder);
-  document.getElementById('pvBank').textContent = bankLines.join('\n');
-
-  const issuerLines = [];
-  if (invoiceForm.issuerName) issuerLines.push(invoiceForm.issuerName);
-  if (invoiceForm.issuerZip) issuerLines.push(`〒${invoiceForm.issuerZip}`);
-  if (invoiceForm.issuerAddress) issuerLines.push(invoiceForm.issuerAddress);
-  if (invoiceForm.issuerTel) issuerLines.push(`TEL: ${invoiceForm.issuerTel}`);
-  if (invoiceForm.issuerEmail) issuerLines.push(invoiceForm.issuerEmail);
-  if (invoiceForm.issuerRegNo) issuerLines.push(`登録番号: ${invoiceForm.issuerRegNo}`);
-  document.getElementById('pvIssuer').textContent = issuerLines.join('\n');
-}
-
-document.getElementById('printBtn').addEventListener('click', () => window.print());
-
-document.getElementById('exportInvoiceCsvBtn').addEventListener('click', () => {
-  const { subtotal, tax, total } = computeTotals();
-  const rows = [
-    ['請求書番号', invoiceForm.invoiceNo],
-    ['発行日', invoiceForm.issueDate],
-    ['支払期限', invoiceForm.dueDate],
-    ['請求先', `${invoiceForm.clientName} ${invoiceForm.clientHonorific}`],
-    ['発行者', invoiceForm.issuerName],
-    [],
-    ['品目', '数量', '単位', '単価', '金額']
-  ];
-  invoiceForm.lineItems.forEach(li => rows.push([li.name, li.qty, li.unit, li.unitPrice, (Number(li.qty)||0)*(Number(li.unitPrice)||0)]));
-  rows.push([]);
-  rows.push(['', '', '', '小計', subtotal]);
-  rows.push(['', '', '', `消費税(${invoiceForm.taxRate}%)`, tax]);
-  rows.push(['', '', '', '合計', total]);
-  downloadCSV(`請求書_${invoiceForm.invoiceNo || todayStr()}.csv`, rows);
-});
-
-document.getElementById('resetFormBtn').addEventListener('click', () => {
-  if (!confirm('請求書の入力内容をリセットしますか?(作業時間表は消えません)')) return;
-  invoiceForm = JSON.parse(JSON.stringify(defaultInvoiceForm));
-  invoiceForm.issueDate = todayStr();
-  saveInvoiceForm();
-  bindFormToState();
-  renderLineItems();
-});
-
-/* ============================================================
    Init
    ============================================================ */
 (function init() {
@@ -1250,17 +876,10 @@ document.getElementById('resetFormBtn').addEventListener('click', () => {
   document.getElementById('rangeFrom').value = formatDateLocal(first);
   document.getElementById('rangeTo').value = formatDateLocal(last);
 
-  if (!invoiceForm.dueDate) {
-    const due = new Date(now.getFullYear(), now.getMonth() + 2, 0);
-    invoiceForm.dueDate = formatDateLocal(due);
-  }
-
   document.getElementById('submitterName').value = submitterName;
   document.getElementById('gridHourlyRate').value = gridHourlyRate;
   document.getElementById('gridMonth').value = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
 
-  bindFormToState();
-  renderLineItems();
   renderTimesheet();
 })();
 </script>
