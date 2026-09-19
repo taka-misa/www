@@ -194,7 +194,7 @@
     <p class="desc">
       対象月の全日付を1行ずつ並べ、開始時刻(その日最初に含めた予定の開始)・終了時刻(最後に含めた予定の終了)・実働時間(含めた予定の合計)を自動計算します。
       「不在」「Out of Office」のような予定は自動的に対象外(空白)になり、その分の時間は「中抜け」として計算されます(上の作業時間表でチェックを入れ直せば含めることもできます)。
-      作業メモには「在宅」「オフィス」のみ表示され、オフィスの日は行が青色で強調表示されます。休憩時間(昼休みなど)は日ごとに手入力してください。
+      作業メモには「在宅」「オフィス」のみ表示され、オフィスの日は行が青色で強調表示されます。休憩時間は実働時間が6時間以上の日は自動的に1時間を差し引きます(手入力で上書きも可能)。
     </p>
     <div class="field-row">
       <div class="field">
@@ -772,14 +772,17 @@ function buildMonthGrid(monthStr) {
     const dow = new Date(y, m - 1, d).getDay();
     const dayEvents = (byDate[dateStr] || []).slice().sort((a, b) => a.start.localeCompare(b.start));
     const extra = dayExtra[dateStr] || {};
-    const breakHoursSet = extra.breakHours !== undefined && extra.breakHours !== null && extra.breakHours !== '';
-    const breakHours = breakHoursSet ? (Number(extra.breakHours) || 0) : 0;
+    const breakOverridden = extra.breakHours !== undefined && extra.breakHours !== null && extra.breakHours !== '';
 
     let startStr = '', endStr = '', workHours = 0, spanHours = 0, awayHours = 0, memo = '';
+    let breakHours = 0, breakHoursSet = breakOverridden;
     if (dayEvents.length) {
       startStr = dayEvents[0].start;
       endStr = dayEvents.reduce((latest, e) => (e.end > latest ? e.end : latest), dayEvents[0].end);
       workHours = dayEvents.reduce((s, e) => s + (Number(e.hours) || 0), 0);
+      // auto-default: a day with 6+ hours of actual work gets a 1-hour break unless manually overridden
+      breakHours = breakOverridden ? (Number(extra.breakHours) || 0) : (workHours >= 6 ? 1 : 0);
+      breakHoursSet = breakOverridden || workHours >= 6;
       const s = new Date(`1970-01-01T${startStr}:00`);
       const en = new Date(`1970-01-01T${endStr}:00`);
       spanHours = Math.max(0, (en - s) / 3600000);
