@@ -749,6 +749,18 @@ function formatHMS(hoursDecimal) {
   const h = Math.floor(totalSeconds / 3600), m = Math.floor((totalSeconds % 3600) / 60), s = totalSeconds % 60;
   return `${h}:${pad2(m)}:${pad2(s)}`;
 }
+function parseHMToHours(str) {
+  str = (str || '').trim();
+  if (str === '') return null;
+  if (str.includes(':')) {
+    const parts = str.split(':').map(Number);
+    if (parts.some(isNaN)) return null;
+    const [h, m] = parts;
+    return h + m / 60;
+  }
+  const n = parseFloat(str);
+  return isNaN(n) ? null : n;
+}
 
 function daysInMonth(monthStr) {
   const [y, m] = monthStr.split('-').map(Number);
@@ -818,7 +830,7 @@ function renderMonthGrid() {
       <td class="${dowClass}">${DOW_KANJI[r.dow]}</td>
       <td>${r.startStr}</td>
       <td>${r.endStr}</td>
-      <td><input type="number" step="0.25" min="0" class="num" data-date="${r.dateStr}" data-field="breakHours" value="${r.hasEvents && r.breakHoursSet ? r.breakHours : ''}" ${r.hasEvents ? '' : 'disabled'}></td>
+      <td><input type="text" class="num" data-date="${r.dateStr}" data-field="breakHours" placeholder="1:00" value="${r.hasEvents && r.breakHoursSet ? formatHM(r.breakHours) : ''}" ${r.hasEvents ? '' : 'disabled'}></td>
       <td>${r.hasEvents ? formatHM(r.awayHours) : ''}</td>
       <td>${r.hasEvents ? formatHM(r.workHours) : ''}</td>
       <td><input type="text" data-date="${r.dateStr}" data-field="memo" value="${escapeAttr(r.memo)}"></td>
@@ -834,8 +846,9 @@ document.getElementById('gridBody').addEventListener('change', e => {
   if (!date || !field) return;
   if (!dayExtra[date]) dayExtra[date] = {};
   if (field === 'breakHours') {
-    if (e.target.value === '') delete dayExtra[date].breakHours;
-    else dayExtra[date].breakHours = parseFloat(e.target.value) || 0;
+    const parsed = parseHMToHours(e.target.value);
+    if (parsed === null) delete dayExtra[date].breakHours;
+    else dayExtra[date].breakHours = parsed;
   } else {
     dayExtra[date].memo = e.target.value;
   }
