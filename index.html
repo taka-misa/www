@@ -96,6 +96,9 @@
   table.editable tbody tr:hover { background: #fafbfd; }
   .dow-sun { color: var(--danger); font-weight: bold; }
   .dow-sat { color: var(--accent); font-weight: bold; }
+  table.editable tr.row-office { background: #dbe9fb; }
+  table.editable tr.row-office:hover { background: #cfe1f8; }
+  table.editable tr.row-office td { border-color: #b7cff0; }
   .col-chk { width: 30px; text-align: center; }
   .col-del { width: 30px; text-align: center; }
   .del-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.9rem; padding: 0; }
@@ -190,8 +193,8 @@
     <h2><span class="step-no">3</span>月間タイムシート(提出用フォーマット)</h2>
     <p class="desc">
       対象月の全日付を1行ずつ並べ、開始時刻(その日最初に含めた予定の開始)・終了時刻(最後に含めた予定の終了)・実働時間(含めた予定の合計)を自動計算します。
-      「不在」「Out of Office」のような休憩・離席の予定は、上の作業時間表で「含める」チェックを外しておくと、その分の時間が自動的に「中抜け」として計算されます。
-      休憩時間(昼休みなど)は日ごとに手入力してください。
+      「不在」「Out of Office」のような予定は自動的に対象外(空白)になり、その分の時間は「中抜け」として計算されます(上の作業時間表でチェックを入れ直せば含めることもできます)。
+      作業メモには「在宅」「オフィス」のみ表示され、オフィスの日は行が青色で強調表示されます。休憩時間(昼休みなど)は日ごとに手入力してください。
     </p>
     <div class="field-row">
       <div class="field">
@@ -513,6 +516,18 @@ function expandEventToOccurrences(ev, rangeStart, rangeEnd) {
   return expandRecurring(startDate, durationMs, rule, rangeStart, rangeEnd, exSet).map(o => ({ ...o, allDay }));
 }
 
+const ABSENCE_KEYWORDS = ['不在', 'out of office', 'out of work', '休暇', 'ホリデー'];
+const HOME_KEYWORDS = ['自宅', '在宅'];
+const OFFICE_KEYWORDS = ['オフィス', 'office'];
+
+function titleMatches(title, keywords) {
+  const t = (title || '').toLowerCase();
+  return keywords.some(k => t.includes(k.toLowerCase()));
+}
+function isAbsenceTitle(title) { return titleMatches(title, ABSENCE_KEYWORDS); }
+function isHomeTitle(title) { return titleMatches(title, HOME_KEYWORDS); }
+function isOfficeTitle(title) { return titleMatches(title, OFFICE_KEYWORDS); }
+
 function toInternalEvent(rawEv, occ) {
   const dateStr = formatDateLocal(occ.start);
   let startStr = '', endStr = '', hours = 0;
@@ -521,6 +536,7 @@ function toInternalEvent(rawEv, occ) {
     endStr = formatTimeLocalFixed(occ.end);
     hours = Math.max(0, (occ.end - occ.start) / 3600000);
   }
+  const title = rawEv.summary || '(無題の予定)';
   return {
     id: genId(),
     sourceKey: (rawEv.uid || '') + '|' + occ.start.getTime(),
@@ -528,10 +544,10 @@ function toInternalEvent(rawEv, occ) {
     start: startStr,
     end: endStr,
     hours: Math.round(hours * 100) / 100,
-    title: rawEv.summary || '(無題の予定)',
+    title,
     memo: rawEv.location || '',
     allDay: occ.allDay,
-    include: !occ.allDay
+    include: !occ.allDay && !isAbsenceTitle(title)
   };
 }
 
@@ -768,13 +784,17 @@ function buildMonthGrid(monthStr) {
       const en = new Date(`1970-01-01T${endStr}:00`);
       spanHours = Math.max(0, (en - s) / 3600000);
       awayHours = Math.max(0, spanHours - workHours - breakHours);
-      const defaultMemo = dayEvents.map(e => e.title).filter(Boolean).join('　');
+      const locations = [];
+      if (dayEvents.some(e => isHomeTitle(e.title))) locations.push('在宅');
+      if (dayEvents.some(e => isOfficeTitle(e.title))) locations.push('オフィス');
+      const defaultMemo = locations.join('&');
       memo = (extra.memo !== undefined && extra.memo !== null) ? extra.memo : defaultMemo;
     } else if (extra.memo) {
       memo = extra.memo;
     }
+    const isOffice = dayEvents.some(e => isOfficeTitle(e.title));
 
-    rows.push({ dateStr, d, dow, hasEvents: dayEvents.length > 0, startStr, endStr, breakHours, breakHoursSet, awayHours, workHours, memo });
+    rows.push({ dateStr, d, dow, hasEvents: dayEvents.length > 0, startStr, endStr, breakHours, breakHoursSet, awayHours, workHours, memo, isOffice });
   }
   return rows;
 }
@@ -789,6 +809,7 @@ function renderMonthGrid() {
     totalWork += r.workHours;
     const dowClass = r.dow === 0 ? 'dow-sun' : (r.dow === 6 ? 'dow-sat' : '');
     const tr = document.createElement('tr');
+    if (r.isOffice) tr.classList.add('row-office');
     tr.innerHTML = `
       <td>${toSlashDate(r.dateStr)}</td>
       <td class="${dowClass}">${DOW_KANJI[r.dow]}</td>
