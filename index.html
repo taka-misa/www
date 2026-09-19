@@ -785,8 +785,8 @@ function buildMonthGrid(monthStr) {
       spanHours = Math.max(0, (en - s) / 3600000);
       awayHours = Math.max(0, spanHours - workHours - breakHours);
       const locations = [];
-      if (dayEvents.some(e => isHomeTitle(e.title))) locations.push('在宅');
       if (dayEvents.some(e => isOfficeTitle(e.title))) locations.push('オフィス');
+      if (dayEvents.some(e => isHomeTitle(e.title))) locations.push('在宅');
       const defaultMemo = locations.join('&');
       memo = (extra.memo !== undefined && extra.memo !== null) ? extra.memo : defaultMemo;
     } else if (extra.memo) {
