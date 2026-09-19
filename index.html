@@ -306,6 +306,7 @@ function parseICS(text) {
       case 'DESCRIPTION': cur.description = unescapeText(value); break;
       case 'UID': cur.uid = value; break;
       case 'STATUS': cur.status = value.trim().toUpperCase(); break;
+      case 'RECURRENCE-ID': cur.recurrenceId = { value, params }; break;
       default: break;
     }
   }
@@ -667,10 +668,24 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     try {
       const text = await file.text();
       const rawEvents = parseICS(text);
+      // a single occurrence of a recurring event edited in Google Calendar is exported as a
+      // separate VEVENT carrying RECURRENCE-ID (the original scheduled time it replaces).
+      // Build a set of those so the recurring master doesn't also generate its default-time
+      // occurrence for that date, which would otherwise silently overwrite the edited one.
+      const overrideKeys = new Set();
+      rawEvents.forEach(re => {
+        if (!re.uid || !re.recurrenceId) return;
+        const info = parseDT(re.recurrenceId.value, re.recurrenceId.params);
+        if (!info) return;
+        const d = info.allDay ? new Date(info.y, info.mo - 1, info.d) : info.date;
+        overrideKeys.add(re.uid + '|' + d.getTime());
+      });
+
       rawEvents.forEach(re => {
         try {
           const occs = expandEventToOccurrences(re, rangeStart, rangeEnd);
           occs.forEach(occ => {
+            if (re.rrule && re.uid && overrideKeys.has(re.uid + '|' + occ.start.getTime())) return;
             const internal = toInternalEvent(re, occ);
             // re-importing refreshes an event's time/title from the calendar (handy after
             // editing an event and re-exporting) while keeping the user's include choice
