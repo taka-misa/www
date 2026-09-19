@@ -787,6 +787,37 @@ function daysInMonth(monthStr) {
   return new Date(y, m, 0).getDate();
 }
 
+function timeToMinutes(hhmm) {
+  const [h, mi] = hhmm.split(':').map(Number);
+  return h * 60 + mi;
+}
+function mergeIntervals(intervals) {
+  const sorted = intervals.slice().sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  sorted.forEach(iv => {
+    const last = merged[merged.length - 1];
+    if (last && iv[0] <= last[1]) last[1] = Math.max(last[1], iv[1]);
+    else merged.push(iv.slice());
+  });
+  return merged;
+}
+function overlapMinutes(a, b) {
+  return Math.max(0, Math.min(a[1], b[1]) - Math.max(a[0], b[0]));
+}
+// 中抜け should only count 不在/Out of Office time that isn't also covered by a real
+// work event (e.g. a meeting that happens to fall inside an "unavailable" block still
+// counts as work, not as time away)
+function uncoveredAbsenceHours(absenceEvents, workEvents) {
+  const workIntervals = mergeIntervals(workEvents.map(e => [timeToMinutes(e.start), timeToMinutes(e.end)]));
+  let minutes = 0;
+  absenceEvents.forEach(e => {
+    const a = [timeToMinutes(e.start), timeToMinutes(e.end)];
+    const covered = workIntervals.reduce((sum, w) => sum + overlapMinutes(a, w), 0);
+    minutes += Math.max(0, (a[1] - a[0]) - covered);
+  });
+  return minutes / 60;
+}
+
 function buildMonthGrid(monthStr) {
   if (!monthStr) return [];
   const [y, m] = monthStr.split('-').map(Number);
@@ -821,7 +852,10 @@ function buildMonthGrid(monthStr) {
       const s = new Date(`1970-01-01T${startStr}:00`);
       const en = new Date(`1970-01-01T${endStr}:00`);
       spanHours = Math.max(0, (en - s) / 3600000);
-      awayHours = bucket.absence.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
+      // 勤務場所(自宅/オフィス)の予定はその日の在席場所を示すだけで、実際の作業予定
+      // ではないため、不在時間と重なっているかどうかの判定には使わない
+      const realWorkEvents = workEvents.filter(e => !isOfficeTitle(e.title) && !isHomeTitle(e.title));
+      awayHours = uncoveredAbsenceHours(bucket.absence, realWorkEvents);
       const netBeforeBreak = Math.max(0, spanHours - awayHours);
       // auto-default: a day with 6+ net hours (after 中抜け) gets a 1-hour break unless manually overridden
       breakHours = breakOverridden ? (Number(extra.breakHours) || 0) : (netBeforeBreak >= 6 ? 1 : 0);
