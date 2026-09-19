@@ -539,7 +539,7 @@ function toInternalEvent(rawEv, occ) {
   const title = rawEv.summary || '(無題の予定)';
   return {
     id: genId(),
-    sourceKey: (rawEv.uid || '') + '|' + occ.start.getTime(),
+    sourceKey: (rawEv.uid || '') + '|' + dateStr,
     date: dateStr,
     start: startStr,
     end: endStr,
@@ -661,9 +661,8 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   const rangeStart = new Date(`${fromVal}T00:00:00`);
   const rangeEnd = new Date(`${toVal}T23:59:59.999`);
   const excludeKeywords = document.getElementById('excludeKeywords').value.split(',').map(s => s.trim()).filter(Boolean);
-  const existingKeys = new Set(events.map(e => e.sourceKey).filter(Boolean));
 
-  let addedCount = 0, skippedCount = 0, errorCount = 0;
+  let addedCount = 0, updatedCount = 0, errorCount = 0;
   for (const file of files) {
     try {
       const text = await file.text();
@@ -673,8 +672,14 @@ document.getElementById('importBtn').addEventListener('click', async () => {
           const occs = expandEventToOccurrences(re, rangeStart, rangeEnd);
           occs.forEach(occ => {
             const internal = toInternalEvent(re, occ);
-            if (existingKeys.has(internal.sourceKey)) { skippedCount++; return; }
-            existingKeys.add(internal.sourceKey);
+            // re-importing refreshes an event's time/title from the calendar (handy after
+            // editing an event and re-exporting) while keeping the user's include choice
+            const existingIdx = events.findIndex(e => e.sourceKey && e.sourceKey === internal.sourceKey);
+            if (existingIdx !== -1) {
+              events[existingIdx] = { ...internal, id: events[existingIdx].id, include: events[existingIdx].include };
+              updatedCount++;
+              return;
+            }
             if (excludeKeywords.some(k => internal.title.includes(k))) internal.include = false;
             events.push(internal);
             addedCount++;
@@ -687,8 +692,8 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     }
   }
   renderTimesheet();
-  let msg = `${addedCount}件の予定を取り込みました。`;
-  if (skippedCount) msg += `(重複 ${skippedCount}件はスキップ)`;
+  let msg = `${addedCount}件の予定を新規に取り込みました。`;
+  if (updatedCount) msg += `(既存${updatedCount}件は最新の内容に更新)`;
   if (errorCount) msg += `(${errorCount}件は解析エラーのためスキップ)`;
   setImportStatus(msg, false);
 });
@@ -838,7 +843,7 @@ function renderMonthGrid() {
       <td class="${dowClass}">${DOW_KANJI[r.dow]}</td>
       <td>${r.startStr}</td>
       <td>${r.endStr}</td>
-      <td><input type="text" class="num" data-date="${r.dateStr}" data-field="breakHours" placeholder="1:00" value="${r.hasEvents && r.breakHoursSet ? formatHM(r.breakHours) : ''}" ${r.hasEvents ? '' : 'disabled'}></td>
+      <td><input type="text" class="num" data-date="${r.dateStr}" data-field="breakHours" ${r.hasEvents ? 'placeholder="1:00"' : ''} value="${r.hasEvents && r.breakHoursSet ? formatHM(r.breakHours) : ''}" ${r.hasEvents ? '' : 'disabled'}></td>
       <td>${r.hasEvents ? formatHM(r.awayHours) : ''}</td>
       <td>${r.hasEvents ? formatHM(r.workHours) : ''}</td>
       <td><input type="text" data-date="${r.dateStr}" data-field="memo" value="${escapeAttr(r.memo)}"></td>
