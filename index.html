@@ -184,6 +184,8 @@
       <button type="button" class="secondary" id="addRowBtn">＋ 行を追加</button>
       <button type="button" class="secondary" id="checkAllBtn">全て含める</button>
       <button type="button" class="secondary" id="uncheckAllBtn">全て除外</button>
+      <button type="button" class="secondary" id="dedupeBtn">重複行を削除</button>
+      <button type="button" class="secondary" id="excludeAbsenceBtn">「不在」系をまとめて除外</button>
       <button type="button" id="exportCsvBtn">作業時間表をCSVで書き出す(Excel/スプレッドシートで開けます)</button>
     </div>
   </section>
@@ -652,6 +654,31 @@ document.getElementById('addRowBtn').addEventListener('click', () => {
 });
 document.getElementById('checkAllBtn').addEventListener('click', () => { events.forEach(e => e.include = true); renderTimesheet(); });
 document.getElementById('uncheckAllBtn').addEventListener('click', () => { events.forEach(e => e.include = false); renderTimesheet(); });
+
+document.getElementById('dedupeBtn').addEventListener('click', () => {
+  const seen = new Set();
+  const deduped = [];
+  events.forEach(ev => {
+    if (ev.sourceKey) {
+      if (seen.has(ev.sourceKey)) return;
+      seen.add(ev.sourceKey);
+    }
+    deduped.push(ev);
+  });
+  const removed = events.length - deduped.length;
+  events = deduped;
+  renderTimesheet();
+  setImportStatus(`重複していた${removed}件の予定を削除しました。`, false);
+});
+
+document.getElementById('excludeAbsenceBtn').addEventListener('click', () => {
+  let count = 0;
+  events.forEach(ev => {
+    if (ev.include && isAbsenceTitle(ev.title)) { ev.include = false; count++; }
+  });
+  renderTimesheet();
+  setImportStatus(`「不在」「Out of Office」系の予定 ${count}件のチェックを外しました。`, false);
+});
 
 document.getElementById('importBtn').addEventListener('click', async () => {
   const files = document.getElementById('icsFiles').files;
