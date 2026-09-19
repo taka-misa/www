@@ -771,45 +771,53 @@ function buildMonthGrid(monthStr) {
   if (!monthStr) return [];
   const [y, m] = monthStr.split('-').map(Number);
   const numDays = daysInMonth(monthStr);
+  // group timed events per day into "work" (counts toward the day's span) and
+  // "absence" (excluded events recognized as 不在/Out of Office - their duration
+  // becomes 中抜け rather than being ignored outright)
   const byDate = {};
   events.forEach(ev => {
-    if (!ev.include || ev.allDay) return;
-    if (!byDate[ev.date]) byDate[ev.date] = [];
-    byDate[ev.date].push(ev);
+    if (ev.allDay) return;
+    if (!byDate[ev.date]) byDate[ev.date] = { work: [], absence: [] };
+    if (ev.include) byDate[ev.date].work.push(ev);
+    else if (isAbsenceTitle(ev.title)) byDate[ev.date].absence.push(ev);
   });
 
   const rows = [];
   for (let d = 1; d <= numDays; d++) {
     const dateStr = `${y}-${pad2(m)}-${pad2(d)}`;
     const dow = new Date(y, m - 1, d).getDay();
-    const dayEvents = (byDate[dateStr] || []).slice().sort((a, b) => a.start.localeCompare(b.start));
+    const bucket = byDate[dateStr] || { work: [], absence: [] };
+    const workEvents = bucket.work.slice().sort((a, b) => a.start.localeCompare(b.start));
+    const allTimed = workEvents.concat(bucket.absence);
     const extra = dayExtra[dateStr] || {};
     const breakOverridden = extra.breakHours !== undefined && extra.breakHours !== null && extra.breakHours !== '';
 
     let startStr = '', endStr = '', workHours = 0, spanHours = 0, awayHours = 0, memo = '';
     let breakHours = 0, breakHoursSet = breakOverridden;
-    if (dayEvents.length) {
-      startStr = dayEvents[0].start;
-      endStr = dayEvents.reduce((latest, e) => (e.end > latest ? e.end : latest), dayEvents[0].end);
-      workHours = dayEvents.reduce((s, e) => s + (Number(e.hours) || 0), 0);
-      // auto-default: a day with 6+ hours of actual work gets a 1-hour break unless manually overridden
-      breakHours = breakOverridden ? (Number(extra.breakHours) || 0) : (workHours >= 6 ? 1 : 0);
-      breakHoursSet = breakOverridden || workHours >= 6;
+    const hasEvents = workEvents.length > 0;
+    if (hasEvents) {
+      startStr = allTimed.reduce((earliest, e) => (e.start < earliest ? e.start : earliest), allTimed[0].start);
+      endStr = allTimed.reduce((latest, e) => (e.end > latest ? e.end : latest), allTimed[0].end);
       const s = new Date(`1970-01-01T${startStr}:00`);
       const en = new Date(`1970-01-01T${endStr}:00`);
       spanHours = Math.max(0, (en - s) / 3600000);
-      awayHours = Math.max(0, spanHours - workHours - breakHours);
+      awayHours = bucket.absence.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
+      const netBeforeBreak = Math.max(0, spanHours - awayHours);
+      // auto-default: a day with 6+ net hours (after 中抜け) gets a 1-hour break unless manually overridden
+      breakHours = breakOverridden ? (Number(extra.breakHours) || 0) : (netBeforeBreak >= 6 ? 1 : 0);
+      breakHoursSet = breakOverridden || netBeforeBreak >= 6;
+      workHours = Math.max(0, netBeforeBreak - breakHours);
       const locations = [];
-      if (dayEvents.some(e => isOfficeTitle(e.title))) locations.push('オフィス');
-      if (dayEvents.some(e => isHomeTitle(e.title))) locations.push('在宅');
+      if (workEvents.some(e => isOfficeTitle(e.title))) locations.push('オフィス');
+      if (workEvents.some(e => isHomeTitle(e.title))) locations.push('在宅');
       const defaultMemo = locations.join('&');
       memo = (extra.memo !== undefined && extra.memo !== null) ? extra.memo : defaultMemo;
     } else if (extra.memo) {
       memo = extra.memo;
     }
-    const isOffice = dayEvents.some(e => isOfficeTitle(e.title));
+    const isOffice = workEvents.some(e => isOfficeTitle(e.title));
 
-    rows.push({ dateStr, d, dow, hasEvents: dayEvents.length > 0, startStr, endStr, breakHours, breakHoursSet, awayHours, workHours, memo, isOffice });
+    rows.push({ dateStr, d, dow, hasEvents, startStr, endStr, breakHours, breakHoursSet, awayHours, workHours, memo, isOffice });
   }
   return rows;
 }
