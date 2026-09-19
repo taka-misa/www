@@ -96,6 +96,8 @@
   table.editable input:focus { border-color: var(--accent); background: #fff; outline: none; }
   table.editable input.num { text-align: right; }
   table.editable tbody tr:hover { background: #fafbfd; }
+  .dow-sun { color: var(--danger); font-weight: bold; }
+  .dow-sat { color: var(--accent); font-weight: bold; }
   .col-chk { width: 30px; text-align: center; }
   .col-del { width: 30px; text-align: center; }
   .del-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.9rem; padding: 0; }
@@ -224,9 +226,56 @@
     </div>
   </section>
 
-  <!-- STEP 3: invoice -->
+  <!-- STEP 3: monthly grid timesheet -->
+  <section class="panel" id="step2b">
+    <h2><span class="step-no">3</span>月間タイムシート(提出用フォーマット)</h2>
+    <p class="desc">
+      対象月の全日付を1行ずつ並べ、開始時刻(その日最初に含めた予定の開始)・終了時刻(最後に含めた予定の終了)・実働時間(含めた予定の合計)を自動計算します。
+      「不在」「Out of Office」のような休憩・離席の予定は、上の作業時間表で「含める」チェックを外しておくと、その分の時間が自動的に「中抜け」として計算されます。
+      休憩時間(昼休みなど)は日ごとに手入力してください。
+    </p>
+    <div class="field-row">
+      <div class="field">
+        <label for="submitterName">受託者名</label>
+        <input type="text" id="submitterName" placeholder="例: 高階 美佐子">
+      </div>
+      <div class="field">
+        <label for="gridMonth">対象年月</label>
+        <input type="month" id="gridMonth">
+      </div>
+      <div class="field">
+        <label for="gridHourlyRate">時間単価(円・税込)</label>
+        <input type="number" id="gridHourlyRate" step="1" min="0" style="width:110px;">
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="editable" id="gridTable">
+        <thead>
+          <tr>
+            <th>日付</th>
+            <th>曜日</th>
+            <th>開始時刻</th>
+            <th>終了時刻</th>
+            <th style="width:90px;">休憩時間</th>
+            <th>中抜け</th>
+            <th>実働時間</th>
+            <th>作業メモ</th>
+          </tr>
+        </thead>
+        <tbody id="gridBody"></tbody>
+      </table>
+    </div>
+    <div class="total-line">
+      <span>総勤務時間: <strong id="gridTotal">0:00:00</strong></span>
+    </div>
+    <div class="btn-row">
+      <button type="button" id="exportGridCsvBtn">月間タイムシートをCSVで書き出す</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: invoice -->
   <section class="panel" id="step3">
-    <h2><span class="step-no">3</span>請求書を作成する</h2>
+    <h2><span class="step-no">4</span>請求書を作成する</h2>
     <p class="desc">時給制(作業時間 × 単価)で金額を計算します。入力内容はこの端末のブラウザに自動保存されます。</p>
 
     <div class="two-col">
@@ -724,6 +773,7 @@ function updateTotalDisplay() {
   events.forEach(ev => { if (ev.include) total += Number(ev.hours) || 0; });
   document.getElementById('tsTotal').textContent = total.toFixed(2);
   refreshInvoiceHoursHint(total);
+  if (typeof renderMonthGrid === 'function') renderMonthGrid();
 }
 
 document.getElementById('tsBody').addEventListener('input', e => {
@@ -840,6 +890,170 @@ document.getElementById('exportCsvBtn').addEventListener('click', () => {
   rows.push([]);
   rows.push(['', '', '', total.toFixed(2), '合計', '']);
   downloadCSV(`作業時間表_${todayStr()}.csv`, rows);
+});
+
+/* ============================================================
+   Monthly grid timesheet (提出用フォーマット)
+   ============================================================ */
+const DOW_KANJI = ['日', '月', '火', '水', '木', '金', '土'];
+
+function loadJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) { return fallback; }
+}
+function saveJSON(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+}
+
+let submitterName = loadJSON('ts_submitter_name', '');
+let gridHourlyRate = loadJSON('ts_grid_hourly_rate', '');
+let dayExtra = loadJSON('ts_day_extra', {}); // { 'YYYY-MM-DD': { breakHours, memo } }
+
+function toSlashDate(iso) { return iso.replace(/-/g, '/'); }
+
+function formatHM(hoursDecimal) {
+  const totalMinutes = Math.max(0, Math.round((Number(hoursDecimal) || 0) * 60));
+  const h = Math.floor(totalMinutes / 60), m = totalMinutes % 60;
+  return `${h}:${pad2(m)}`;
+}
+function formatHMS(hoursDecimal) {
+  const totalSeconds = Math.max(0, Math.round((Number(hoursDecimal) || 0) * 3600));
+  const h = Math.floor(totalSeconds / 3600), m = Math.floor((totalSeconds % 3600) / 60), s = totalSeconds % 60;
+  return `${h}:${pad2(m)}:${pad2(s)}`;
+}
+
+function daysInMonth(monthStr) {
+  const [y, m] = monthStr.split('-').map(Number);
+  return new Date(y, m, 0).getDate();
+}
+
+function buildMonthGrid(monthStr) {
+  if (!monthStr) return [];
+  const [y, m] = monthStr.split('-').map(Number);
+  const numDays = daysInMonth(monthStr);
+  const byDate = {};
+  events.forEach(ev => {
+    if (!ev.include || ev.allDay) return;
+    if (!byDate[ev.date]) byDate[ev.date] = [];
+    byDate[ev.date].push(ev);
+  });
+
+  const rows = [];
+  for (let d = 1; d <= numDays; d++) {
+    const dateStr = `${y}-${pad2(m)}-${pad2(d)}`;
+    const dow = new Date(y, m - 1, d).getDay();
+    const dayEvents = (byDate[dateStr] || []).slice().sort((a, b) => a.start.localeCompare(b.start));
+    const extra = dayExtra[dateStr] || {};
+    const breakHoursSet = extra.breakHours !== undefined && extra.breakHours !== null && extra.breakHours !== '';
+    const breakHours = breakHoursSet ? (Number(extra.breakHours) || 0) : 0;
+
+    let startStr = '', endStr = '', workHours = 0, spanHours = 0, awayHours = 0, memo = '';
+    if (dayEvents.length) {
+      startStr = dayEvents[0].start;
+      endStr = dayEvents.reduce((latest, e) => (e.end > latest ? e.end : latest), dayEvents[0].end);
+      workHours = dayEvents.reduce((s, e) => s + (Number(e.hours) || 0), 0);
+      const s = new Date(`1970-01-01T${startStr}:00`);
+      const en = new Date(`1970-01-01T${endStr}:00`);
+      spanHours = Math.max(0, (en - s) / 3600000);
+      awayHours = Math.max(0, spanHours - workHours - breakHours);
+      const defaultMemo = dayEvents.map(e => e.title).filter(Boolean).join('　');
+      memo = (extra.memo !== undefined && extra.memo !== null) ? extra.memo : defaultMemo;
+    } else if (extra.memo) {
+      memo = extra.memo;
+    }
+
+    rows.push({ dateStr, d, dow, hasEvents: dayEvents.length > 0, startStr, endStr, breakHours, breakHoursSet, awayHours, workHours, memo });
+  }
+  return rows;
+}
+
+function renderMonthGrid() {
+  const monthStr = document.getElementById('gridMonth').value;
+  const rows = buildMonthGrid(monthStr);
+  const tbody = document.getElementById('gridBody');
+  tbody.innerHTML = '';
+  let totalWork = 0;
+  rows.forEach(r => {
+    totalWork += r.workHours;
+    const dowClass = r.dow === 0 ? 'dow-sun' : (r.dow === 6 ? 'dow-sat' : '');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${toSlashDate(r.dateStr)}</td>
+      <td class="${dowClass}">${DOW_KANJI[r.dow]}</td>
+      <td>${r.startStr}</td>
+      <td>${r.endStr}</td>
+      <td><input type="number" step="0.25" min="0" class="num" data-date="${r.dateStr}" data-field="breakHours" value="${r.hasEvents && r.breakHoursSet ? r.breakHours : ''}" ${r.hasEvents ? '' : 'disabled'}></td>
+      <td>${r.hasEvents ? formatHM(r.awayHours) : ''}</td>
+      <td>${r.hasEvents ? formatHM(r.workHours) : ''}</td>
+      <td><input type="text" data-date="${r.dateStr}" data-field="memo" value="${escapeAttr(r.memo)}"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('gridTotal').textContent = formatHMS(totalWork);
+  saveJSON('ts_day_extra', dayExtra);
+}
+
+document.getElementById('gridBody').addEventListener('change', e => {
+  const date = e.target.dataset.date, field = e.target.dataset.field;
+  if (!date || !field) return;
+  if (!dayExtra[date]) dayExtra[date] = {};
+  if (field === 'breakHours') {
+    if (e.target.value === '') delete dayExtra[date].breakHours;
+    else dayExtra[date].breakHours = parseFloat(e.target.value) || 0;
+  } else {
+    dayExtra[date].memo = e.target.value;
+  }
+  saveJSON('ts_day_extra', dayExtra);
+  renderMonthGrid();
+});
+
+document.getElementById('submitterName').addEventListener('input', e => {
+  submitterName = e.target.value;
+  saveJSON('ts_submitter_name', submitterName);
+});
+document.getElementById('gridHourlyRate').addEventListener('input', e => {
+  gridHourlyRate = e.target.value;
+  saveJSON('ts_grid_hourly_rate', gridHourlyRate);
+});
+document.getElementById('gridMonth').addEventListener('change', renderMonthGrid);
+
+document.getElementById('exportGridCsvBtn').addEventListener('click', () => {
+  const monthStr = document.getElementById('gridMonth').value;
+  if (!monthStr) { alert('対象年月を指定してください'); return; }
+  const [y, m] = monthStr.split('-').map(Number);
+  const rows = buildMonthGrid(monthStr);
+  const totalWork = rows.reduce((s, r) => s + r.workHours, 0);
+  const rate = Number(gridHourlyRate) || 0;
+
+  const out = [
+    ['時間管理シート', '', '', '', '', '', '', ''],
+    [y, '年', m, '月', '', '', '受託者名', submitterName],
+    ['', '', '', '', '', '', '', ''],
+    ['日付', '曜日', '開始時刻', '終了時刻', '休憩時間', '中抜け', '実働時間', '作業メモ']
+  ];
+  // pad to a fixed 31 date rows so the layout matches a standard monthly template
+  for (let d = 1; d <= 31; d++) {
+    const r = rows[d - 1];
+    if (!r) { out.push(['', '', '', '', '', '', '', '']); continue; }
+    out.push([
+      toSlashDate(r.dateStr),
+      DOW_KANJI[r.dow],
+      r.startStr,
+      r.endStr,
+      r.hasEvents && r.breakHoursSet ? formatHM(r.breakHours) : '',
+      r.hasEvents ? formatHM(r.awayHours) : '',
+      r.hasEvents ? formatHM(r.workHours) : '',
+      r.memo
+    ]);
+  }
+  out.push(['総勤務時間', '', '', '', '', '', formatHMS(totalWork), '']);
+  if (rate > 0) {
+    out.push(['', '', '', '', '', '', `時間単価：${rate.toLocaleString('ja-JP')}円(税込)`, '']);
+    out.push(['', '', '', '', '', '', Math.round(totalWork * rate).toLocaleString('ja-JP'), '']);
+  }
+  downloadCSV(`月間タイムシート_${monthStr}.csv`, out);
 });
 
 /* ============================================================
@@ -1040,6 +1254,10 @@ document.getElementById('resetFormBtn').addEventListener('click', () => {
     const due = new Date(now.getFullYear(), now.getMonth() + 2, 0);
     invoiceForm.dueDate = formatDateLocal(due);
   }
+
+  document.getElementById('submitterName').value = submitterName;
+  document.getElementById('gridHourlyRate').value = gridHourlyRate;
+  document.getElementById('gridMonth').value = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
 
   bindFormToState();
   renderLineItems();
